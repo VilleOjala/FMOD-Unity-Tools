@@ -1,8 +1,8 @@
 # FMOD-Unity-Tools
 Audio Implementation Tools for FMOD and Unity\
 Copyright 2020, Ville Ojala, All rights reserved\
-contact: ville.p.ojala(at)outlook.com\
-website: www.unrivaledaudio.com
+ville.p.ojala(at)outlook.com\
+www.unrivaledaudio.com
 
 DESCRIPTION:
 
