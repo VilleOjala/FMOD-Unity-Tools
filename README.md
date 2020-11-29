@@ -3,7 +3,7 @@ Audio Implementation Tools for FMOD and Unity\
 Copyright 2020, Ville Ojala, All rights reserved\
 ville.p.ojala(at)outlook.com
 
-DESCRIPTION:
+DESCRIPTION
 
 A synergistic set of audio implementation tools for the interface of Unity game engine and FMOD Studio audio middleware.
 
@@ -16,7 +16,7 @@ A synergistic set of audio implementation tools for the interface of Unity game 
 - Spatial Audio System
 - Pause Menu System
 
-DOCUMENTATION:
+DOCUMENTATION
 
 User guide:
 
