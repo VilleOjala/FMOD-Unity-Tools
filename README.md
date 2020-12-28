@@ -26,6 +26,7 @@ Additional info about the Spatial Audio System:
 
 https://drive.google.com/file/d/140Nbs2cJ5GJeMNf_92SEu92Z4GDIi1Wi/view?usp=sharin
 
+
 Third party dependencies:
 
-    FMOD Studio API version 2.01.04 (Copyright (c) Firelight Technologies, Pty, Ltd, 2011-2020)
+- FMOD Studio API version 2.01.04 (Copyright (c) Firelight Technologies, Pty, Ltd, 2011-2020)
