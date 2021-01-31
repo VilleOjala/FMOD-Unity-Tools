@@ -18,11 +18,11 @@ namespace AudioTools
         
         private const string ObstructionParameter = "Obstruction"; // A local parameter with exactly this name needs to created inside the FMOD Studio project.
         private const int ObstructionMinValue = 0; // <- The local parameter min value needs to be set as '0' inside the FMOD Studio project. 
-        private const int ObstructionMaxValue = 1; //  <- The local parameter min value needs to be set as '1' inside the FMOD Studio project.
+        private const int ObstructionMaxValue = 1; //  <- The local parameter max value needs to be set as '1' inside the FMOD Studio project.
 
         private const string PropagationCostParameter = "PropagationCost";
         private const int CostMinValue = 0; // <- The local parameter min value needs to be set as '0' inside the FMOD Studio. 
-        private const int CostMaxValue = 1; //  <- The local parameter min value needs to be set as '1' inside the FMOD Studio.
+        private const int CostMaxValue = 1; //  <- The local parameter max value needs to be set as '1' inside the FMOD Studio.
 
         public ActiveModes activeModes;
         public DrawDebugLines drawDebugLines;
