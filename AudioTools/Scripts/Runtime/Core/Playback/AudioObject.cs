@@ -483,7 +483,7 @@ namespace AudioTools
 
             eventOptions = eventReferences;
         }
-
+#endif
 
         [AOT.MonoPInvokeCallback(typeof(FMOD.Studio.EVENT_CALLBACK))]
         FMOD.RESULT EventInstanceCreatedCallback(EVENT_CALLBACK_TYPE type, IntPtr instancePtr, IntPtr parameterPtr)
@@ -532,5 +532,4 @@ namespace AudioTools
             return FMOD.RESULT.OK;
         }     
     }
-#endif
 }
