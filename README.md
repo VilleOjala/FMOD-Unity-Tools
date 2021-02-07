@@ -1,7 +1,6 @@
 # FMOD-Unity-Tools
 Audio Implementation Tools for FMOD and Unity\
 Copyright 2020, Ville Ojala, All rights reserved\
-ville.p.ojala(at)outlook.com
 
 DESCRIPTION
 
