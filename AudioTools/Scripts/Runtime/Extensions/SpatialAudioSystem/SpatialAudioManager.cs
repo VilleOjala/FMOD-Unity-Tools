@@ -1028,7 +1028,7 @@ namespace AudioTools
                         }                    
                     }
 
-                    if (unvisitedRoomFound == true)
+                    if (unvisitedRoomFound)
                     {
                         SpatialAudioRoom currentUnvisitedRoom = unvisitedRoom;
 
@@ -1235,7 +1235,7 @@ namespace AudioTools
             return totalDistance;
         }
 
-        private bool CheckIfLastNodeIsPlayer (SpatialAudioRoute route)
+        private bool CheckIfLastNodeIsPlayer(SpatialAudioRoute route)
         {
             if (route != null && route.routePoints != null && route.routePoints.Count > 0)
             {
