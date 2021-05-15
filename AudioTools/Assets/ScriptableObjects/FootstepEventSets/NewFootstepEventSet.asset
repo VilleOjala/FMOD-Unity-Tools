@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1680dab8fa7560f4bb287c530257f9a0, type: 3}
+  m_Name: NewFootstepEventSet
+  m_EditorClassIdentifier: 
+  surfaceType: 0
+  shoeOrFeetType: 1
+  movementType: 4
+  combinationData:
+  - combination: Boots_Concrete_Walk
+    eventOptions:
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Walk_01
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Walk_02
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Walk_03
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Walk_04
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Walk_05
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Walk_06
+  - combination: Boots_Concrete_Run
+    eventOptions:
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Run_01
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Run_02
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Run_03
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Run_04
+  - combination: Boots_Concrete_WalkCrouched
+    eventOptions:
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Walk_01
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Walk_02
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Walk_03
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Walk_04
+  - combination: Boots_Concrete_RunCrouched
+    eventOptions:
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Walk_04
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Walk_05
+    - event:/Movement/Footsteps/Boots/Concrete/Boots_Concrete_Walk_06
+  - combination: Boots_Concrete_StairsDownRunCrouched
+    eventOptions: []
+  - combination: Boots_Concrete_RunCrouchedStairsUp
+    eventOptions: []
+  - combination: Boots_Concrete_Sidle
+    eventOptions: []
