@@ -1,4 +1,5 @@
 # FMOD-Unity-Tools
+MIT License
 Audio Implementation Tools for FMOD and Unity\
 Copyright 2020, Ville Ojala, All rights reserved\
 
