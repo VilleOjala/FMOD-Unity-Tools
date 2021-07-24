@@ -125,8 +125,11 @@ namespace AudioTools
 
             foreach (var outputInstance in playingOutputInstances)
             {
-                float weight = outputInstance.SpatializerAttenuation / totalSpatializerAttenuations;
-                outputInstance.SetVolume(weight);
+                if (outputInstance != null)
+                {
+                    float weight = outputInstance.SpatializerAttenuation / totalSpatializerAttenuations;
+                    outputInstance.SetVolume(weight);                
+                }
             }
 
             #if UNITY_EDITOR
