@@ -3,8 +3,6 @@ Audio Implementation Tools for FMOD and Unity\
 MIT License\
 Copyright 2021, Ville Ojala
 
-Happy to receive any questions, suggestions or feedback at ville@unrivaledaudio.com
-
 DESCRIPTION
 
 A synergistic set of audio implementation tools for the interface of Unity game engine and FMOD Studio audio middleware.
