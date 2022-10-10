@@ -56,7 +56,7 @@ namespace AudioTools
                 if (eventDescription.isValid())
                 {
                     eventDescription.is3D(out is3D);
-                    eventDescription.getMaximumDistance(out maxDistance);
+                    eventDescription.getMinMaxDistance(out float minDistance, out maxDistance);
                 }
                 else
                 {

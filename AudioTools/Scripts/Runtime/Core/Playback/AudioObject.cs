@@ -274,8 +274,7 @@ namespace AudioTools
                     }
                     else
                     {
-                        float maxDistance;
-                        eventDescription.getMaximumDistance(out maxDistance);
+                        eventDescription.getMinMaxDistance(out float minDistance, out float maxDistance);
                         SpatialAudioManager.Instance.RegisterRoomAwareInstance(eventInstance, transformToFollow, maxDistance, initialRoom, false);
                     }
                 }

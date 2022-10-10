@@ -64,8 +64,7 @@ namespace AudioTools
                 return;
             }
 
-            float maxDist;
-            outputEventDescription.getMaximumDistance(out maxDist);
+            outputEventDescription.getMinMaxDistance(out float minDistance, out float maxDist);
             MaxDistance = maxDist;
 
             if (MaxDistance == 0)
