@@ -1,7 +1,7 @@
 # FMOD-Unity-Tools
 Audio Implementation Tools for FMOD and Unity\
 MIT License\
-Copyright 2021, Ville Ojala
+Copyright 2022, Ville Ojala
 
 DESCRIPTION
 
@@ -33,6 +33,5 @@ https://www.youtube.com/watch?v=7FuzJBkfzzQ
 
 Third party dependencies:
 
-- FMOD Studio/API version 2.01.04 (Copyright (c) Firelight Technologies, Pty, Ltd, 2011-2020)
-- FMOD Studio Unity Integration version 2.01.04 (Copyright (c) Firelight Technologies, Pty, Ltd, 2011-2020)
-- Unity version 2019.4.10f1 or newer (not tested on older versions, but could very well still work)
+- FMOD version: 2.02.09 (Unity verified)
+- Tested in Unity version: 2021.3.7f1 (LTS) 
