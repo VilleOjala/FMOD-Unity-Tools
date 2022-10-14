@@ -1,17 +1,15 @@
-﻿// MIT License
-// Audio Implementation Tools for FMOD and Unity
-// Copyright 2021, Ville Ojala.
+﻿// FMOD-Unity-Tools by Ville Ojala
+// MIT License
 // https://github.com/VilleOjala/FMOD-Unity-Tools
 
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace AudioTools
-{
-    // Only instantiate Spatial Audio Portals with the 'Add Spatial Audio Protal" -button of the Spatial Audio Manager.
-
-    [AddComponentMenu("Audio Tools/Extensions/Spatial Audio System/Spatial Audio Portal")]
+namespace FMODUnityTools
+{ 
+    [AddComponentMenu("FMOD Unity Tools/Extensions/Spatial Audio System/Spatial Audio Portal"), 
+     Tooltip("Only instantiate Spatial Audio Portals with the 'Add Spatial Audio Protal\" -button of the Spatial Audio Manager.")]
     public class SpatialAudioPortal : MonoBehaviour
     {
         [Tooltip("Optionally give the portal a unique name for more informative debug messages.")]
@@ -42,19 +40,15 @@ namespace AudioTools
         [HideInInspector]
         public AnimationCurve closeEnvelope = new AnimationCurve(new Keyframe(0.0f, 0.0f), new Keyframe(1.0f, 1.0f));
 
-        [Range(0.0f, 10.0f), HideInInspector]
+        [Range(0.0f, 15.0f), HideInInspector]
         public float openFadeTime = 0.3f;
 
-        [Range(0.0f, 10.0f), HideInInspector]
+        [Range(0.0f, 15.0f), HideInInspector]
         public float closeFadeTime = 0.3f;
 
-        // 0 = portal open
-        // 1 = portal closed
-        private float portalStatus = 0; 
-        public float PortalStatus
-        {
-            get { return portalStatus; }
-        }
+        /// <summary>0 = portal open, 1 = portal closed
+        /// </summary>
+        public float PortalStatus { get; private set; } = 0;
 
         [HideInInspector]
         public string debugPortalStatus = "";
@@ -71,16 +65,11 @@ namespace AudioTools
         public enum PortalInitialState
         {
             Open,
-            Closed,
-            ControlledFromOutside
+            Closed
         };
 
         void Awake()
         {
-            // Portals are open by default, so no need to ever explicitly set them as such.
-            // The 'Controlled From Outside' is for marking portals the openness state of which is controlled by another script
-            // <- e.g. code related to the status of physical doors etc.
-            // <- Important to use this mode if the order of execution of scripts is unclear.
             if (portalType == PortalType.Opening && initialState == PortalInitialState.Closed)
             {
                 SetPortalClosed(false);
@@ -98,11 +87,11 @@ namespace AudioTools
         {
             if (portalType == PortalType.Opening)
             {
-                if (portalStatus < 1 && inProgressOpen)
+                if (PortalStatus < 1 && inProgressOpen)
                     debugPortalStatus = "Portal status: Opening";
-                else if(portalStatus < 1 && inProgressClose)
+                else if(PortalStatus < 1 && inProgressClose)
                     debugPortalStatus = "Portal status: Closing";
-                else if(!inProgressClose && !inProgressOpen && portalStatus < 1)
+                else if(!inProgressClose && !inProgressOpen && PortalStatus < 1)
                     debugPortalStatus = "Portal status: Open";
                 else if(!inProgressClose && !inProgressOpen)
                     debugPortalStatus = "Portal status: Closed";
@@ -119,9 +108,13 @@ namespace AudioTools
             }
 
             if (allowFade)
-                StartCoroutine(ClosePortal(portalStatus, closeFadeTime));
+            {
+                StartCoroutine(ClosePortal(PortalStatus, closeFadeTime));
+            }
             else
-                StartCoroutine(ClosePortal(portalStatus, 0));
+            {
+                StartCoroutine(ClosePortal(PortalStatus, 0));
+            }
         }
 
         public void SetPortalOpen(bool allowFade)
@@ -133,9 +126,13 @@ namespace AudioTools
             }
 
             if (allowFade)
-                StartCoroutine(OpenPortal(portalStatus, openFadeTime));
+            {
+                StartCoroutine(OpenPortal(PortalStatus, openFadeTime));
+            }
             else
-                StartCoroutine(OpenPortal(portalStatus, 0));
+            {
+                StartCoroutine(OpenPortal(PortalStatus, 0));
+            }
         }
 
         public void SetConnectedRoom(SpatialAudioRoom room)
@@ -144,7 +141,7 @@ namespace AudioTools
             {
                 string offendingPortal = (string.IsNullOrEmpty(portalName) ? gameObject.name : portalName);
                 Debug.LogError("Spatial Audio Portal '" + offendingPortal + "' already has been assigned with a pair of rooms that it connects. " +
-                               "Each portal can only connect one room pair.");
+                               "Each portal can only connect one pair of rooms.");
             }
             else if (room != null)
             {
@@ -159,8 +156,8 @@ namespace AudioTools
 
         private IEnumerator OpenPortal(float start, float duration)
         {
-            duration = portalStatus * duration;
-            float fadeTimePassed = 0.0f;
+            duration = PortalStatus * duration;
+            float fadeTimePassed = 0f;
             inProgressOpen = true;
             inProgressClose = false;
 
@@ -168,16 +165,14 @@ namespace AudioTools
             {
                 fadeTimePassed += Time.deltaTime;
                 float percent = Mathf.Clamp01(fadeTimePassed / duration);
-                float curvePercent = openEnvelope.Evaluate(percent);
-                curvePercent = Mathf.Clamp01(curvePercent);
-                portalStatus = start - (start * curvePercent);
-
+                float curvePercent = Mathf.Clamp01(openEnvelope.Evaluate(percent));
+                PortalStatus = start - (start * curvePercent);
                 yield return null;
             }
 
             if (!inProgressClose)
             {
-                portalStatus = 0.0f;
+                PortalStatus = 0.0f;
             }
 
             inProgressOpen = false;
@@ -185,7 +180,7 @@ namespace AudioTools
 
         private IEnumerator ClosePortal(float start, float duration)
         {
-            duration = (1 - portalStatus) * duration;
+            duration = (1 - PortalStatus) * duration;
             float fadeTimePassed = 0.0f;
             inProgressClose = true;
             inProgressOpen = false;
@@ -194,17 +189,15 @@ namespace AudioTools
             {
                 fadeTimePassed += Time.deltaTime;
                 float percent = Mathf.Clamp01(fadeTimePassed / duration);
-                float curvePercent = closeEnvelope.Evaluate(percent);
-                curvePercent = Mathf.Clamp01(curvePercent);
+                float curvePercent = Mathf.Clamp01(closeEnvelope.Evaluate(percent));
                 float totalFade = 1.0f - start;
-                portalStatus = start + (totalFade * curvePercent);
-
+                PortalStatus = start + (totalFade * curvePercent);
                 yield return null;
             }
 
             if (!inProgressOpen)
             {
-                portalStatus = 1.0f;
+                PortalStatus = 1.0f;
             }
 
             inProgressClose = false;
@@ -215,23 +208,6 @@ namespace AudioTools
             var copyPortalTransformScale = transform.localScale;        
             copyPortalTransformScale.z = 0;
             transform.localScale = copyPortalTransformScale;
-
-            if (!string.IsNullOrEmpty(portalName))
-                gameObject.name = portalName;
-            else
-                gameObject.name = "SpatialAudioPortal";
-        }
-
-        void Reset()
-        {
-            // Check if a layer with the name "AudioTooslPortal" has been created.
-            // If found, automatically assign this layer to the portal gameObject.
-            int layerIndex = LayerMask.NameToLayer("AudioToolsPortal");
-
-            if (layerIndex > -1)
-            {
-                gameObject.layer = layerIndex;
-            }
         }
     }
 }

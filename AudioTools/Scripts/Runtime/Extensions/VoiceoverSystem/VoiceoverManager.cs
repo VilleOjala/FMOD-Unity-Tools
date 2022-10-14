@@ -1,30 +1,33 @@
-﻿// MIT License
-// Audio Implementation Tools for FMOD and Unity
-// Copyright 2021, Ville Ojala.
+﻿// FMOD-Unity-Tools by Ville Ojala
+// MIT License
 // https://github.com/VilleOjala/FMOD-Unity-Tools
 
 using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace AudioTools
+namespace FMODUnityTools
 {
-    [AddComponentMenu("Audio Tools/Extensions/Voiceover System/Voiceover Manager")]
+    [AddComponentMenu("FMOD Unity Tools/Extensions/Voiceover System/Voiceover Manager")]
     public class VoiceoverManager : MonoBehaviour
     {
         public event Action<string> DialogueReleased;
-
         public List<VoiceoverPlaybackHandler> voiceoverPlaybackHandlers = new List<VoiceoverPlaybackHandler>();
         private List<VoiceoverPlaybackHandler> validPlaybackHandlers = new List<VoiceoverPlaybackHandler>();
         private Dictionary<Speaker, VoiceoverPlaybackHandler> playbackHandlersBySpeaker = new Dictionary<Speaker, VoiceoverPlaybackHandler>();
-
-        public VoiceoverDurationSet voiceoverDurationSet;
-        private Dictionary<string, float> durationByKey = new Dictionary<string, float>();
+        
+        public KeyOffsetData keyOffsetData;
+        private Dictionary<string, float> keyOffsetPairs = new Dictionary<string, float>();
 
         private Dictionary<string, List<Speaker>> activeDialogues = new Dictionary<string, List<Speaker>>();
         private List<QueuedLine> queuedLines = new List<QueuedLine>();
 
-        class QueuedLine
+        [Tooltip("Default offset in seconds in relation to the length of the voiceover file, " +
+                 "which gives us the duration after which the next line in a dialogue can start to play")]
+        [Min(0), SerializeField]
+        private float defaultReleaseOffset = 0.5f;
+
+        private class QueuedLine
         {
             public Speaker speaker;
             public string key;
@@ -39,17 +42,18 @@ namespace AudioTools
 
                 if (playbackHandler != null)
                 {
-                    bool isInitialized = playbackHandler.Initialize(this);
+                    bool wasInitialized = playbackHandler.Initialize(this);
 
-                    if (isInitialized)
+                    if (wasInitialized)
+                    {
                         validPlaybackHandlers.Add(playbackHandler);
+                    }                
                 }
             }
            
             for (int i = 0; i < validPlaybackHandlers.Count; i++)
             {
                 var playbackHandler = validPlaybackHandlers[i];
-
                 Speaker speaker = playbackHandler.speaker;
 
                 if (!playbackHandlersBySpeaker.ContainsKey(speaker))
@@ -58,33 +62,33 @@ namespace AudioTools
                 }
                 else
                 {
-                    Debug.LogWarning("Speaker + '" + speaker.ToString() + "' has multiple Voiceover Playback Handlers.");
+                    Debug.LogWarning("Speaker + '" + speaker.ToString() + "' has multiple VoiceoverPlaybackHandlers.");
                 }
             }
 
-            if (voiceoverDurationSet != null)
+            if (keyOffsetData != null)
             {
-                for (int i = 0; i < voiceoverDurationSet.keyDurations.Count; i++)
+                for (int i = 0; i < keyOffsetData.keyOffsets.Count; i++)
                 {
-                    var pairing = voiceoverDurationSet.keyDurations[i];
+                    var pair = keyOffsetData.keyOffsets[i];
 
-                    if (pairing != null)
+                    if (pair != null)
                     {
-                        if (!durationByKey.ContainsKey(pairing.key))
+                        if (!keyOffsetPairs.ContainsKey(pair.key))
                         {
-                            durationByKey.Add(pairing.key, pairing.duration);
+                            keyOffsetPairs.Add(pair.key, pair.offset);
                         }
                         else
                         {
-                            Debug.LogWarning("Voiceover Duration Set has multiple '" + pairing.key + "' keys.");
+                            Debug.LogWarning("KeyOffsetData has multiple entries for key: " + pair.key);
                         }
                     }
                 }
             }
         }
 
-        //Game's dialogue system should call this function to start playing voiceovers for a new dialogue 
-        // or to provide the next line in an already playing dialogue when it receives a release callback from the Voiceover Manager.
+        // Game's dialogue system should call this function to start playing voiceovers for a new dialogue 
+        // or to provide the next line in an already playing dialogue when it receives a release callback from the VoiceoverManager.
         public void PlayDialogue(Speaker speaker, string key, string dialogueName)
         {
             if (playbackHandlersBySpeaker.ContainsKey(speaker))
@@ -96,32 +100,30 @@ namespace AudioTools
                 }
 
                 var playbackHandler = playbackHandlersBySpeaker[speaker];
+                float releaseOffset = defaultReleaseOffset;
 
-                float durationOverride = -1;
-
-                if (durationByKey.Count > 0 && durationByKey.ContainsKey(key))
+                if (keyOffsetPairs.ContainsKey(key))
                 {
-                    float value = durationByKey[key];
-
-                    if (value >= 0)
-                        durationOverride = value;
+                    releaseOffset = keyOffsetPairs[key];
                 }
 
                 // If return = -1 <- something unexpected failed in starting the dialogue.
                 // If return = 0 <- the speaker is busy with another dialogue line, queue this line and try again once the speaker reports that is free.
                 // If return = 1 <- starting the line succeeded.
-                int result = playbackHandler.PlayVoiceover(key, dialogueName, durationOverride);
+                int result = playbackHandler.PlayVoiceover(key, dialogueName, releaseOffset);
 
                 if (result == 1)
                 {
                     var speakers = activeDialogues[dialogueName];
 
-                    if (speakers.Contains(speaker) == false)
+                    if (!speakers.Contains(speaker))
+                    {
                         speakers.Add(speaker);
+                    }
                 }
                 else if (result == 0)
                 {
-                    QueuedLine queuedLine = new QueuedLine();
+                    var queuedLine = new QueuedLine();
                     queuedLine.speaker = speaker;
                     queuedLine.key = key;
                     queuedLine.dialogueName = dialogueName;
@@ -155,7 +157,7 @@ namespace AudioTools
                     }
                 }
             
-                // 2. Stop any possible actively talking speakers associated with the finished dialogue. 
+                // 2. Stop any actively talking speakers associated with the finished dialogue. 
                 var speakers = activeDialogues[dialogueName];
 
                 for (int i = 0; i < speakers.Count; i++)
@@ -175,7 +177,7 @@ namespace AudioTools
             }
         }
 
-        // Voiceover Playback Handlers report themselves as being available for a new dialogue line once they are finished with the previous one.
+        // VoiceoverPlaybackHandlers report themselves as being available for a new dialogue line once they are finished with the previous one.
         public void ReportSpeakerAvailability(Speaker availableSpeaker, string latestPlayingDialogue)
         {
             // Remove the association of the speaker with the dialogue it just finished playing voiceovers for (if the dialogue is still active).
@@ -195,9 +197,9 @@ namespace AudioTools
             {
                 QueuedLine queuedLine = queuedLines[i];
 
-                if(queuedLine.speaker == availableSpeaker && !validQueuedLineFound)
+                if (queuedLine.speaker == availableSpeaker && !validQueuedLineFound)
                 {
-                    // If there are multiple queued lines for the speaker the latest addition will be played.
+                    // If there are multiple queued lines for the speaker, the latest addition will be played.
                     validQueuedLineFound = true;
                     PlayDialogue(queuedLine.speaker, queuedLine.key, queuedLine.dialogueName);
                     queuedLines.RemoveAt(i);
@@ -206,7 +208,7 @@ namespace AudioTools
 
             if (!validQueuedLineFound && activeDialogues.ContainsKey(latestPlayingDialogue))
             {
-                // Send a callback telling the dialogue system that it can now provide the Voiceover Manager with the next line in an active dialogue.
+                // Send a callback telling the dialogue system that it can now provide VoiceoverManager with the next line in an active dialogue.
                 DialogueReleased?.Invoke(latestPlayingDialogue);
             }
         }

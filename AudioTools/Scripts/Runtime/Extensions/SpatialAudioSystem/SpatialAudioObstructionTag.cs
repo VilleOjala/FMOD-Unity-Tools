@@ -1,74 +1,79 @@
-﻿// MIT License
-// Audio Implementation Tools for FMOD and Unity
-// Copyright 2021, Ville Ojala.
+﻿// FMOD-Unity-Tools by Ville Ojala
+// MIT License
 // https://github.com/VilleOjala/FMOD-Unity-Tools
 
+using System.Collections.Generic;
 using UnityEngine;
+using System.Linq;
 
-namespace AudioTools
+namespace FMODUnityTools
 {
-    [AddComponentMenu("Audio Tools/Extensions/Spatial Audio System/Spatial Audio Obstruction Tag")]
+    [AddComponentMenu("FMOD Unity Tools/Extensions/Spatial Audio System/Spatial Audio Obstruction Tag")]
     public class SpatialAudioObstructionTag : MonoBehaviour
     {
-        public bool tagActive = true;
-        public Collider[] colliders;
-
+        [SerializeField]
+        private bool tagActive = true;
+        private List<Collider> colliders;
         private bool hasBeenDisabled = false;
 
-        void Start()
+        private void RetrieveAndReportColliders()
         {
-            if (tagActive && colliders != null && SpatialAudioManager.Instance != null)
+            colliders = GetComponentsInChildren<Collider>().ToList();
+
+            if (SpatialAudioManager.Instance != null)
             {
-                for (int i = 0; i < colliders.Length; i++)
+                foreach (var collider in colliders)
                 {
-                    if (colliders[i] != null)
-                        SpatialAudioManager.Instance.AddObstructingCollider(colliders[i]);
+                    SpatialAudioManager.Instance.AddObstructingCollider(collider);
                 }
+            }
+        }
+
+        private void UnreportColliders()
+        {
+            if (SpatialAudioManager.Instance != null)
+            {
+                foreach (var collider in colliders)
+                {
+                    if (collider == null)
+                        continue;
+
+                    SpatialAudioManager.Instance.RemoveObstructingCollider(collider);
+                }
+            }
+        }
+
+        private void Start()
+        {
+            if (tagActive)
+            {
+                RetrieveAndReportColliders(); 
             }              
         }
 
-        void OnEnable()
+        private void OnEnable()
         {
-            if (hasBeenDisabled && tagActive && colliders != null && SpatialAudioManager.Instance != null)
+            if (hasBeenDisabled && tagActive)
             {
-                for (int i = 0; i < colliders.Length; i++)
-                {
-                    if (colliders[i] != null)
-                        SpatialAudioManager.Instance.AddObstructingCollider(colliders[i]);
-                }
+                RetrieveAndReportColliders();
             }
         }
 
-        void OnDestroy()
+        private void OnDisable()
         {
-            if (tagActive && colliders != null && SpatialAudioManager.Instance != null)
+            if (tagActive)
             {
-                for (int i = 0; i < colliders.Length; i++)
-                {
-                    if (colliders[i] != null)
-                        SpatialAudioManager.Instance.RemoveObstructingCollider(colliders[i]);
-                }
+                hasBeenDisabled = true;
+                UnreportColliders();
             }
         }
 
-        void OnDisable()
+        private void OnDestroy()
         {
-            hasBeenDisabled = true;
-
-            if (tagActive && colliders != null && SpatialAudioManager.Instance != null)
+            if (tagActive)
             {
-                for (int i = 0; i < colliders.Length; i++)
-                {
-                    if (colliders[i] != null)
-                        SpatialAudioManager.Instance.RemoveObstructingCollider(colliders[i]);
-                }
+                UnreportColliders();
             }
-        }
-
-        void Reset()
-        {
-            var c = gameObject.GetComponents<Collider>();
-            colliders = c;
         }
     }
 }

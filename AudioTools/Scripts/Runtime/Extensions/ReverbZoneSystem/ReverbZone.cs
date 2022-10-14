@@ -1,107 +1,78 @@
-﻿// MIT License
-// Audio Implementation Tools for FMOD and Unity
-// Copyright 2021, Ville Ojala.
+﻿// FMOD-Unity-Tools by Ville Ojala
+// MIT License
 // https://github.com/VilleOjala/FMOD-Unity-Tools
 
-using System.Collections.Generic;
 using UnityEngine;
+using FMOD.Studio;
+using FMODUnity;
 
-namespace AudioTools
+namespace FMODUnityTools
 {
-    [AddComponentMenu("Audio Tools/Extensions/Reverb Zone System/Reverb Zone")]
+    [AddComponentMenu("FMOD Unity Tools/Extensions/Reverb Zone System/Reverb Zone")]
     public class ReverbZone : MonoBehaviour
     {
-        public string snapshotPath = "snapshot:/";
-        public List<AudioTriggerArea> audioTriggerAreas = new List<AudioTriggerArea>();
-        private List<AudioTriggerArea> validAudioTriggerAreas = new List<AudioTriggerArea>();
+        public EventReference snaphotReference;
+        private EventDescription snapshotDescription;
+        private EventInstance snapshotInstance;
+        public AudioTriggerArea audioTriggerArea;
 
-        FMOD.Studio.EventInstance snapshotInstance;
-
-        private bool initializationSuccesfull = false;
-        private int insideCount = 0;
-
-        void Start()
+        private void Awake()
         {
-            if (audioTriggerAreas != null && audioTriggerAreas.Count > 0)
+            if (audioTriggerArea != null)
             {
-                foreach (var audioTriggerArea in audioTriggerAreas)
+                audioTriggerArea.Triggered += TriggeredHandler;
+            }
+
+            HelperMethods.TryRetrieveDescriptionIfNotAlreadyValid(snaphotReference, ref snapshotDescription);
+        }
+
+        private void TriggeredHandler(TriggerEventType triggerEventType)
+        {
+            if (triggerEventType == TriggerEventType.TriggerEnter)
+            {
+                if (!snapshotDescription.isValid())
+                    return;
+
+                if (!snapshotInstance.isValid())
                 {
-                    if (audioTriggerArea != null)
+                    snapshotDescription.createInstance(out snapshotInstance);
+                    snapshotInstance.start();
+                }
+                else
+                {
+                    snapshotInstance.getPlaybackState(out PLAYBACK_STATE playbackState);
+
+                    if (playbackState == PLAYBACK_STATE.STARTING || playbackState == PLAYBACK_STATE.PLAYING)
+                        return;
+
+                    if (playbackState == PLAYBACK_STATE.STOPPING || playbackState == PLAYBACK_STATE.STOPPED)
                     {
-                        validAudioTriggerAreas.Add(audioTriggerArea);
-                        audioTriggerArea.OnTriggerAreaEvent += AudioTriggerArea_OnTriggerAreaEvent;
+                        StopIfPlaying();
                     }
                 }
             }
-
-            if (validAudioTriggerAreas.Count < 1)
-                return;
-
-            if (string.IsNullOrEmpty(snapshotPath))
-                return;
-
-            initializationSuccesfull = true;
-        }
-
-        private void AudioTriggerArea_OnTriggerAreaEvent(object sender, AudioTriggerAreaEventArgs e)
-        {
-            if (e.triggerEventType == AudioTriggerAreaEventArgs.TriggerEventType.TriggerEnter)
+            else if (triggerEventType == TriggerEventType.TriggerExit)
             {
-                insideCount++;
-
-                if (insideCount == 1 && initializationSuccesfull)
-                {
-                    snapshotInstance = FMODUnity.RuntimeManager.CreateInstance(snapshotPath);
-
-                    if (snapshotInstance.isValid())
-                    {
-                        snapshotInstance.start();
-                    }
-                    else
-                    {
-                        Debug.LogError("Snapshot event path is invalid for Reverb Zone " + gameObject.name + ".");
-                    }
-                }
-            }
-            else
-            {
-                insideCount--;
-
-                if (insideCount == 0 && initializationSuccesfull)
-                {
-                    if (snapshotInstance.isValid())
-                    {
-                        snapshotInstance.stop(FMOD.Studio.STOP_MODE.IMMEDIATE);
-                        snapshotInstance.release();                        
-                    }
-                }
+                StopIfPlaying();
             }
         }
 
-        void OnValidate()
-        {         
-            if (string.IsNullOrEmpty(snapshotPath))
-            {
-                snapshotPath = "snapshot:/";
-            }          
-        }
-
-        void Reset()
+        private void OnDisable()
         {
-            gameObject.name = "ReverbZone";    
+            StopIfPlaying();
+
+            if (audioTriggerArea != null)
+            { 
+                audioTriggerArea.Triggered -= TriggeredHandler;
+            }
         }
 
-        void OnDestroy()
+        private void StopIfPlaying()
         {
             if (snapshotInstance.isValid())
             {
                 snapshotInstance.stop(FMOD.Studio.STOP_MODE.IMMEDIATE);
                 snapshotInstance.release();
-            }
-
-            foreach (var audioTriggerArea in validAudioTriggerAreas)
-            {
-                audioTriggerArea.OnTriggerAreaEvent -= AudioTriggerArea_OnTriggerAreaEvent;
             }
         }
     }

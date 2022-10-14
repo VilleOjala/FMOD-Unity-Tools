@@ -3,15 +3,13 @@
 // Copyright 2021, Ville Ojala.
 // https://github.com/VilleOjala/FMOD-Unity-Tools
 
-using System.Collections;
 using UnityEngine;
 using FMOD.Studio;
 using FMODUnity;
 
-namespace AudioTools
+namespace FMODUnityTools
 {
     [AddComponentMenu("Audio Tools/Extensions/Reverb Zone System/Reverb Blend Zone")]
-    [RequireComponent(typeof(Rigidbody))]
     public class ReverbBlendZone : MonoBehaviour
     {
         [ParamRef]
@@ -40,6 +38,8 @@ namespace AudioTools
         public GameObject upWall;
 
         [HideInInspector]
+        public Collider blendAreaCollider;
+        [HideInInspector]
         public Collider backWallCollider;
         [HideInInspector]
         public Collider frontWallCollider;
@@ -51,13 +51,6 @@ namespace AudioTools
         public Collider downWallCollider;
         [HideInInspector]
         public Collider upWallCollider;
-
-        private float checkInterval = 0.1f;
-        Coroutine coroutine;
-
-        AudioActorTag playerTag;
-        private bool alreadyCachedPlayerTag = false;
-        int insideCounter = 0;
 
         private bool initializationSuccesfull = false;
 
@@ -81,134 +74,117 @@ namespace AudioTools
             }
 
             if (string.IsNullOrEmpty(frontParameter) || string.IsNullOrEmpty(backParameter))
-                return;
-
-            FMOD.RESULT result;
-
-            PARAMETER_DESCRIPTION frontDescription;
-            result = RuntimeManager.StudioSystem.getParameterDescriptionByName(frontParameter, out frontDescription);
-            if (result != FMOD.RESULT.OK)
-                return;
-            else
             {
-                frontID = frontDescription.id;
+                Debug.LogWarning("Parameters missing for ReverbBlendZone.");
+                return;
             }
 
-            PARAMETER_DESCRIPTION backDescription;
-            result = RuntimeManager.StudioSystem.getParameterDescriptionByName(backParameter, out backDescription);
+            var result = RuntimeManager.StudioSystem.getParameterDescriptionByName(frontParameter, out PARAMETER_DESCRIPTION frontDescription);
+
             if (result != FMOD.RESULT.OK)
-                return;
-            else
             {
-                backID = backDescription.id;
+                Debug.LogError(result);
+                return;
             }
 
+            frontID = frontDescription.id;
+            result = RuntimeManager.StudioSystem.getParameterDescriptionByName(backParameter, out PARAMETER_DESCRIPTION backDescription);
+
+            if (result != FMOD.RESULT.OK)
+            {
+                Debug.LogError(result);
+                return;
+            }
+
+            backID = backDescription.id;
+         
             if (blendArea == null || backWall == null || frontWall == null ||
-                backWallCollider == null || frontWallCollider == null)
+                backWallCollider == null || frontWallCollider == null || blendAreaCollider == null)
+            {
+                Debug.LogError("ReverbBlendZone is missing some of its components.");
                 return;
+            }
 
             initializationSuccesfull = true;
         }
 
-        IEnumerator BlendValueCheck()
+        private void Update()
         {
-            while (insideCounter > 0)
+            if (!initializationSuccesfull)
+                return;
+
+            if (blendAreaCollider == null)
             {
-                CalculateBlendValue();
-                yield return new WaitForSeconds(checkInterval);
+                ResetParameterValues();
+                return;
+            }
+
+            bool foundListener = HelperMethods.TryGetListenerPosition(out Vector3 listenerPosition);
+
+            if (!foundListener)
+            {
+                ResetParameterValues();
+                return;
+            }
+
+            bool isInside = HelperMethods.CheckIfInsideCollider(listenerPosition, blendAreaCollider);
+
+            if (isInside)
+            {
+                CalculateReverbBlending(listenerPosition);
+            }
+            else
+            {
+                ResetParameterValues();
             }
         }
 
-        void OnTriggerEnter(Collider other)
+        private void CalculateReverbBlending(Vector3 listenerPosition)
         {
-            var audioActorTag = other.gameObject.GetComponent<AudioActorTag>();
+            Collider positiveCollider = null;
+            Collider negativeCollider = null;
 
-            if (audioActorTag != null && audioActorTag.triggererType == TriggererType.Player)
+            switch (blendAxis)
             {
-                insideCounter++;
-
-                if (insideCounter == 1 && initializationSuccesfull)
-                {
-                    if (!alreadyCachedPlayerTag)
-                    {
-                        playerTag = audioActorTag;
-                        alreadyCachedPlayerTag = true;
-                    }
-
-                    CalculateBlendValue();
-                    coroutine = StartCoroutine(BlendValueCheck());
-                }
+                case BlendAxis.z:
+                    positiveCollider = frontWallCollider;
+                    negativeCollider = backWallCollider;
+                    break;
+                case BlendAxis.y:
+                    positiveCollider = upWallCollider;
+                    negativeCollider = downWallCollider;
+                    break;
+                case BlendAxis.x:
+                    positiveCollider = rightWallCollider;
+                    negativeCollider = leftWallCollider;
+                    break;
+                default:
+                    break;
             }
+
+            Vector3 negativeWallClosestPoint = negativeCollider.ClosestPoint(listenerPosition);
+            Vector3 positiveWallClosestPoint = positiveCollider.ClosestPoint(listenerPosition);
+            float distanceToNegativeWall = Vector3.Distance(listenerPosition, negativeWallClosestPoint);
+            float distanceToPositiveWall = Vector3.Distance(listenerPosition, positiveWallClosestPoint);
+            float totalDistance = distanceToNegativeWall + distanceToPositiveWall;
+
+            if (totalDistance > 0)
+            {
+                float positiveWeight = distanceToNegativeWall / totalDistance;
+                float negativeWeight = distanceToPositiveWall / totalDistance;
+
+                RuntimeManager.StudioSystem.setParameterByID(frontID, positiveWeight, true);
+                RuntimeManager.StudioSystem.setParameterByID(backID, negativeWeight, true);
+            }        
         }
 
-        void OnTriggerExit(Collider other)
-        {
-            var audioActorTag = other.gameObject.GetComponent<AudioActorTag>();
-
-            if (audioActorTag != null && audioActorTag.triggererType == TriggererType.Player)
-            {
-                insideCounter--;
-
-                if (insideCounter == 0 && initializationSuccesfull)
-                {
-                    StopCoroutine(coroutine);
-                }
-            }
-        }
-
-        private void CalculateBlendValue()
-        {
-            if (playerTag != null)
-            {
-                Collider positiveCollider = null;
-                Collider negativeCollider = null;
-
-                switch (blendAxis)
-                {
-                    case BlendAxis.z:
-                        positiveCollider = frontWallCollider;
-                        negativeCollider = backWallCollider;
-                        break;
-                    case BlendAxis.y:
-                        positiveCollider = upWallCollider;
-                        negativeCollider = downWallCollider;
-                        break;
-                    case BlendAxis.x:
-                        positiveCollider = rightWallCollider;
-                        negativeCollider = leftWallCollider;
-                        break;
-                    default:
-                        break;
-                }
-
-                Vector3 playerPosition = playerTag.transform.position;
-
-                Vector3 negativeWallClosestPoint = negativeCollider.ClosestPoint(playerPosition);
-                Vector3 positiveWallClosestPoint = positiveCollider.ClosestPoint(playerPosition);
-
-                float distanceToNegativeWall = Vector3.Distance(playerPosition, negativeWallClosestPoint);
-                float distanceToPositiveWall = Vector3.Distance(playerPosition, positiveWallClosestPoint);
-
-                float totalDistance = distanceToNegativeWall + distanceToPositiveWall;
-
-                if (totalDistance > 0)
-                {
-                    float positiveWeight = distanceToNegativeWall / totalDistance;
-                    float negativeWeight = distanceToPositiveWall / totalDistance;
-
-                    RuntimeManager.StudioSystem.setParameterByID(frontID, positiveWeight, true);
-                    RuntimeManager.StudioSystem.setParameterByID(backID, negativeWeight, true);
-                }
-            }
-        }
-
-        // Default value should have been set to '1' inside FMOD Studio
+        // Default value should be set to '1' inside FMOD Studio
         private void ResetParameterValues()
         {
             if (initializationSuccesfull)
             {
-                FMODUnity.RuntimeManager.StudioSystem.setParameterByID(frontID, 1, true);
-                FMODUnity.RuntimeManager.StudioSystem.setParameterByID(backID, 1, true);
+                RuntimeManager.StudioSystem.setParameterByID(frontID, 1, true);
+                RuntimeManager.StudioSystem.setParameterByID(backID, 1, true);
             }
         }
 
@@ -218,19 +194,6 @@ namespace AudioTools
             {
                 ResetParameterValues();
             }         
-        }
-
-        void Reset()
-        {
-            gameObject.name = "ReverbBlendZone";
-            var rigidBody = gameObject.GetComponent<Rigidbody>();
-
-            if (rigidBody != null)
-            {
-                rigidBody.isKinematic = true;
-                rigidBody.useGravity = false;
-                rigidBody.hideFlags = HideFlags.NotEditable;
-            }
         }
     }
 }

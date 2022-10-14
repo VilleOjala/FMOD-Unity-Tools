@@ -1,31 +1,28 @@
-﻿// MIT License
-// Audio Implementation Tools for FMOD and Unity
-// Copyright 2021, Ville Ojala.
+﻿// FMOD-Unity-Tools by Ville Ojala
+// MIT License
 // https://github.com/VilleOjala/FMOD-Unity-Tools
 
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace AudioTools
+namespace FMODUnityTools
 {
-    // Only instantiate Spatial Audio Rooms with the 'Add Spatial Audio Room" -button of the Spatial Audio Manager.
-
-    [AddComponentMenu("Audio Tools/Extensions/Spatial Audio System/Spatial Audio Room")]
+    [AddComponentMenu("FMOD Unity Tools/Extensions/Spatial Audio System/Spatial Audio Room"), 
+    Tooltip("Only instantiate Spatial Audio Rooms with the 'Add Spatial Audio Room\" -button of the Spatial Audio Manager")]
     public class SpatialAudioRoom : MonoBehaviour
     {
         private SpatialAudioManager spatialAudioManager;
 
         [Tooltip("Optionally give the room a unique name for more informative debug messages.")]
         public string roomName;
-
-        public AudioTriggerArea area;
+        public AudioTriggerArea triggerArea;
 
         [HideInInspector]
-        public Collider[] colliders;
-
+        public List<Collider> colliders;
         public List<RoomConnection> roomConnections = new List<RoomConnection>();
 
-        [System.Serializable]
+        [Serializable]
         public class RoomConnection
         {
             public SpatialAudioRoom connectedRoom;
@@ -54,7 +51,7 @@ namespace AudioTools
                 return false;
             }
 
-            if (area == null)
+            if (triggerArea == null)
             {
                 string offendingRoom = (string.IsNullOrEmpty(roomName) ? gameObject.name : roomName);
                 Debug.LogError("Audio Trigger Area is null for Spatial Audio Room '" + offendingRoom + "'.");
@@ -62,15 +59,9 @@ namespace AudioTools
             }
             else
             {
-                if (area.requireTag != RequiredTags.Player)
-                {
-                    Debug.LogError("Audio Trigger Areas associated with Spatial Audio Rooms need to have 'Player' as the required tag.");
-                    return false;                  
-                }
+                colliders = triggerArea.GetTriggerColliders();
 
-                colliders = area.GetColliders();
-
-                if (colliders == null || colliders.Length < 1)
+                if (colliders == null || colliders.Count < 1)
                 {
                     string offendingRoom = (string.IsNullOrEmpty(roomName) ? gameObject.name : roomName);
                     Debug.LogError("Spatial Audio Room '" + offendingRoom + "' has no valid trigger colliders.");
@@ -114,7 +105,7 @@ namespace AudioTools
                 }
             }
 
-            // Sanity checks completed. Next, we will set programatically set this room be one of the two rooms that any portal found in room connections connects.
+            // Sanity checks completed. Next, we will programatically set this room be one of the two rooms that any portal found in room connections connects.
             // <- This reduces the need for manual set-up in editor. 
             // <- In addition, the availability of "other-way-around" references simplifies the propagation cost code.
             // In a proper spatial audio geometry setup, each portal can only connect two rooms. 
@@ -129,14 +120,13 @@ namespace AudioTools
                     roomConnection.connectingPortals[j].SetConnectedRoom(this);
                 }
             }
- 
-            area.OnTriggerAreaEvent += OnPlayerEnterAndExit;
-
+            triggerArea.Triggered += TriggeredHandler;
             return true;
         }
-        public void OnPlayerEnterAndExit(object sender, AudioTriggerAreaEventArgs eventArgs)
+
+        public void TriggeredHandler(TriggerEventType triggerEventType)
         {
-            if (eventArgs.triggerEventType == AudioTriggerAreaEventArgs.TriggerEventType.TriggerEnter)
+            if (triggerEventType == TriggerEventType.TriggerEnter)
             {
                 if (spatialAudioManager != null)
                 {
@@ -144,7 +134,7 @@ namespace AudioTools
                 }
             }
 
-            if (eventArgs.triggerEventType == AudioTriggerAreaEventArgs.TriggerEventType.TriggerExit)
+            if (triggerEventType == TriggerEventType.TriggerExit)
             {
                 if (spatialAudioManager != null)
                 {
@@ -155,20 +145,10 @@ namespace AudioTools
 
         void OnDestroy()
         {
-            CleanUp();   
-        }
-
-        void CleanUp()
-        {
-            area.OnTriggerAreaEvent -= OnPlayerEnterAndExit;
-        }
-
-        void OnValidate()
-        {
-            if (!string.IsNullOrEmpty(roomName))
-                gameObject.name = roomName;
-            else
-                gameObject.name = "SpatialAudioRoom";
+            if (triggerArea != null)
+            {
+                triggerArea.Triggered -= TriggeredHandler;
+            }
         }
     }  
 }

@@ -1,11 +1,10 @@
-﻿// MIT License
-// Audio Implementation Tools for FMOD and Unity
-// Copyright 2021, Ville Ojala.
+﻿// FMOD-Unity-Tools by Ville Ojala
+// MIT License
 // https://github.com/VilleOjala/FMOD-Unity-Tools
 
 using UnityEngine;
 
-namespace AudioTools
+namespace FMODUnityTools
 {
     public static class SpatialAudioObstructionChecker
     {
@@ -18,7 +17,7 @@ namespace AudioTools
         public static float ObstructionCheck(Vector3 listenerPosition, Vector3 emitterPosition, bool requireObstructionTag, LayerMask layerMask,
                                               QueryTriggerInteraction queryTriggers, float raycastSpread, bool drawDebugLines, Collider ignoreSelf = null)
         {
-            float numberOfRaysObstructed = 0; // Out of 9.
+            float numberOfRaysObstructed = 0; // out of 9.
 
             Vector3 listenerToEmitterDirection = emitterPosition - listenerPosition;
             Vector3 emitterToListenerDirection = listenerPosition - emitterPosition;
@@ -37,7 +36,6 @@ namespace AudioTools
 
             if (requireObstructionTag)
             {
-
                 numberOfRaysObstructed += RaycastTaggedObstruction(emitterPosition, listenerPosition, layerMask, queryTriggers, drawDebugLines, listenerPosition, listenerToEmitterDirection);
                 numberOfRaysObstructed += RaycastTaggedObstruction(leftFromEmitterPosition, leftFromListenerPosition, layerMask, queryTriggers, drawDebugLines, listenerPosition, listenerToEmitterDirection);
                 numberOfRaysObstructed += RaycastTaggedObstruction(rightFromEmitterPosition, leftFromListenerPosition, layerMask, queryTriggers, drawDebugLines, listenerPosition, listenerToEmitterDirection);
@@ -77,7 +75,7 @@ namespace AudioTools
 
             for (int i = 0; i < hits.Length; i++)
             {
-                if (SpatialAudioManager.Instance != null && SpatialAudioManager.Instance.CheckIfColliderObstructing(hits[i].collider))
+                if (SpatialAudioManager.Instance != null && SpatialAudioManager.Instance.IsObstructingCollider(hits[i].collider))
                 {
                     Vector3 listenerToHitPointDirection = hits[i].point - listenerPosition;
 
@@ -97,7 +95,7 @@ namespace AudioTools
                     }
                 }
 
-                SpatialAudioObstructionTag tag = hits[i].collider.gameObject.GetComponent<SpatialAudioObstructionTag>();
+                var tag = hits[i].collider.gameObject.GetComponent<SpatialAudioObstructionTag>();
 
                 if (tag != null)
                 {
@@ -114,9 +112,7 @@ namespace AudioTools
         private static int RaycastObstruction(Vector3 origin, Vector3 end, LayerMask layerMask, QueryTriggerInteraction queryTriggers, bool debug,
                                               Vector3 listenerToEmitterDirection, Vector3 listenerPosition, Collider ignoreSelf = null)
         {
-            RaycastHit hit;
-
-            if (Physics.Linecast(origin, end, out hit, layerMask, queryTriggers))
+            if (Physics.Linecast(origin, end, out RaycastHit hit, layerMask, queryTriggers))
             {
                 if (ignoreSelf != null && hit.collider == ignoreSelf)
                 {
@@ -127,7 +123,6 @@ namespace AudioTools
                 else
                 {
                     Vector3 listenerToHitPointDirection = hit.point - listenerPosition;
-
                     float angle = Vector3.Angle(listenerToEmitterDirection, listenerToHitPointDirection);
 
                     if (angle < MaximumHitPointAngle)
