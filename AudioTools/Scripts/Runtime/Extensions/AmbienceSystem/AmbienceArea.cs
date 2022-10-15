@@ -189,6 +189,7 @@ namespace FMODUnityTools
             if (!feederInstance.isValid() && feederDescription.isValid())
             {
                 feederDescription.createInstance(out feederInstance);
+                feederInstance.setVolume(0f);
                 feederInstance.start();
             }
         }
