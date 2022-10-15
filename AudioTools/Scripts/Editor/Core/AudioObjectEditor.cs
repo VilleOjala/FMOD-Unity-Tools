@@ -12,11 +12,11 @@ namespace FMODUnityTools
     [CustomEditor(typeof(AudioObject))]
     public class AudioObjectEditor : Editor
     {
-        SerializedProperty initialRoom;
+        SerializedProperty fixedRoom;
 
         public void OnEnable()
         {
-            initialRoom = serializedObject.FindProperty("initialRoom");
+            fixedRoom = serializedObject.FindProperty("fixedRoom");
         }
 
         public override void OnInspectorGUI()
@@ -28,7 +28,7 @@ namespace FMODUnityTools
             if (audioObject.spatialAudioRoomAware)
             {
                 EditorGUILayout.Space();
-                EditorGUILayout.PropertyField(initialRoom, new GUIContent("Initial Room (optional)"));
+                EditorGUILayout.PropertyField(fixedRoom, new GUIContent("Fixed Room (optional)"));
                 EditorGUILayout.Space();
             }
 

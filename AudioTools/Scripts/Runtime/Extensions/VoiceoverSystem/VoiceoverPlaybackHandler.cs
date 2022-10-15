@@ -8,7 +8,6 @@ using System.Runtime.InteropServices;
 using System.Collections;
 using FMOD.Studio;
 using FMODUnity;
-using Cinemachine;
 
 namespace FMODUnityTools
 {
@@ -24,7 +23,7 @@ namespace FMODUnityTools
         public bool spatialAudioRoomAware = false;
 
         [HideInInspector]
-        public SpatialAudioRoom initialRoom;
+        public SpatialAudioRoom fixedRoom;
 
         EVENT_CALLBACK voiceoverCallback;
         bool isSpeaking = false;
@@ -162,7 +161,7 @@ namespace FMODUnityTools
 
                 if (spatialAudioRoomAware && SpatialAudioManager.Instance != null)
                 {
-                    SpatialAudioManager.Instance.RegisterRoomAwareInstance(voiceoverInstance, initialRoom);
+                    SpatialAudioManager.Instance.RegisterRoomAwareInstance(voiceoverInstance, fixedRoom);
                 }
             }
 

@@ -50,18 +50,18 @@ namespace FMODUnityTools
         public List<EventReference> eventReferences = new List<EventReference>();
         private List<EventDescription> eventDescriptions = new List<EventDescription>();
         private List<EventInstance> eventInstances = new List<EventInstance>();
-      
-        public bool singleton = false;
-        public bool spatialAudioRoomAware = false;
-
-        [HideInInspector]
-        public SpatialAudioRoom initialRoom = null;
-        private List<int> availableIndexes = new List<int>();
 
         [Min(0)]
         public int excludePrevious;
         private int _excludePrevious;
         private List<int> excludedIndexes = new List<int>();
+
+        public bool singleton = false;
+        public bool spatialAudioRoomAware = false;
+
+        [HideInInspector]
+        public SpatialAudioRoom fixedRoom = null;
+        private List<int> availableIndexes = new List<int>();
 
         // For visualization purposes in the editor. 
         [HideInInspector]
@@ -147,7 +147,7 @@ namespace FMODUnityTools
                 {
                     if (SpatialAudioManager.Instance != null)
                     {
-                        SpatialAudioManager.Instance.RegisterRoomAwareInstance(eventInstance, initialRoom);
+                        SpatialAudioManager.Instance.RegisterRoomAwareInstance(eventInstance, fixedRoom);
                     }
                 }
             }
@@ -304,7 +304,15 @@ namespace FMODUnityTools
             }
             else
             {
-                IncrementClickCounter();
+                if (clickCounter <= eventReferences.Count - 1)
+                {
+                    currentAttenuationToDraw = eventReferences[clickCounter];
+                }
+                else
+                {
+                    clickCounter = 0;
+                    currentAttenuationToDraw = eventReferences[clickCounter];
+                }
             }
         }
 

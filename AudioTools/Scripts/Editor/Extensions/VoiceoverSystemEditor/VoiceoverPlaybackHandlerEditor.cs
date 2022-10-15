@@ -9,11 +9,11 @@ namespace FMODUnityTools
     [CustomEditor(typeof(VoiceoverPlaybackHandler))]
     public class VoiceoverPlaybackHandlerEditor : Editor
     {
-        SerializedProperty initialRoom;
+        SerializedProperty fixedRoom;
 
         void OnEnable()
         {
-            initialRoom = serializedObject.FindProperty("initialRoom");  
+            fixedRoom = serializedObject.FindProperty("fixedRoom");  
         }
 
         public override void OnInspectorGUI()
@@ -24,7 +24,7 @@ namespace FMODUnityTools
 
             if (targetScript.spatialAudioRoomAware)
             {
-                EditorGUILayout.PropertyField(initialRoom);
+                EditorGUILayout.PropertyField(fixedRoom);
             }
 
             serializedObject.ApplyModifiedProperties();            

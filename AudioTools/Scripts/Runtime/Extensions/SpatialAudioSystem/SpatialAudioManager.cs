@@ -127,7 +127,8 @@ namespace FMODUnityTools
             public Vector3 currentPosition; 
             public Vector3 previousPosition;
             public float maxDistance;
-            public SpatialAudioRoom spatialAudioRoom;
+            public SpatialAudioRoom currentRoom;
+            public SpatialAudioRoom fixedRoom;
         }
 
         private class SpatialAudioNode
@@ -296,7 +297,7 @@ namespace FMODUnityTools
 
         #region Public Methods
 
-        public void RegisterRoomAwareInstance(EventInstance eventInstance, SpatialAudioRoom initialRoom = null)
+        public void RegisterRoomAwareInstance(EventInstance eventInstance, SpatialAudioRoom fixedRoom = null)
         {
             if (!eventInstance.isValid())
                 return;
@@ -309,7 +310,8 @@ namespace FMODUnityTools
             eventInstance.getDescription(out EventDescription eventDescription);
             eventDescription.getMinMaxDistance(out float minDistance, out float maxDistance);
             roomAwareInstance.maxDistance = maxDistance;
-            roomAwareInstance.spatialAudioRoom = initialRoom;
+            roomAwareInstance.currentRoom = fixedRoom;
+            roomAwareInstance.fixedRoom = fixedRoom;
       
             // Set propagation cost and osbtruction (if applicable) to max value, before the first correct values are calculated on LateUpdate.
             if (Instance != null)
@@ -498,13 +500,19 @@ namespace FMODUnityTools
         {
             foreach (var instance in registeredInstances)
             {
-                if (instance.spatialAudioRoom == null)
+                if (instance.fixedRoom != null)
+                {
+                    instance.currentRoom = instance.fixedRoom;
+                    continue;
+                }
+
+                if (instance.currentRoom == null)
                 {
                     var initialRoom = FindInitialRoom(instance.currentPosition);
 
                     if (initialRoom != null)
                     {
-                        instance.spatialAudioRoom = initialRoom;
+                        instance.currentRoom = initialRoom;
                         instancesWithKnownRoom.Add(instance);
                     }
                     else
@@ -522,17 +530,17 @@ namespace FMODUnityTools
                     }
                     else
                     {
-                        var currentRoom = CheckForRoomChange(instance.spatialAudioRoom, instance.currentPosition);
+                        var currentRoom = CheckForRoomChange(instance.currentRoom, instance.currentPosition);
 
                         if (currentRoom != null)
                         {
-                            instance.spatialAudioRoom = currentRoom;
+                            instance.currentRoom = currentRoom;
                             instancesWithKnownRoom.Add(instance);
                         }
                         else
                         {
                             // Remove the previously known room, since we cannot know what has happened when the instance has moved.
-                            instance.spatialAudioRoom = null;
+                            instance.currentRoom = null;
                             instancesWithUnknownRoom.Add(instance);
                         }
                     }
@@ -622,7 +630,7 @@ namespace FMODUnityTools
         {
             foreach (var instance in allRelevantInstances)
             {
-                if (instance.spatialAudioRoom == currentPlayerRoom)
+                if (instance.currentRoom == currentPlayerRoom)
                 {
                     instancesInPlayerRoom.Add(instance);
                 }
@@ -732,7 +740,7 @@ namespace FMODUnityTools
             for (int i = 0; i < instances.Count; i++)
             {
                 RoomAwareInstance instance = instances[i];
-                SpatialAudioRoom instanceRoom = instance.spatialAudioRoom;
+                SpatialAudioRoom instanceRoom = instance.currentRoom;
 
                 portalHitData.Clear();
                 UpdatePortalHitData(instance.currentPosition, playerPosition, ref portalHitData);
