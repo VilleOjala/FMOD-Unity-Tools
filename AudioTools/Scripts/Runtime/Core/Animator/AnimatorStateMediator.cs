@@ -2,6 +2,7 @@
 // MIT License
 // https://github.com/VilleOjala/FMOD-Unity-Tools
 
+using FMODUnity;
 using UnityEngine;
 
 namespace FMODUnityTools
@@ -18,12 +19,14 @@ namespace FMODUnityTools
 
         public AnimatorStateEvent eventType;
         public EventTag eventTag;
+        public ControlAction controlAction;
+        public ParamRef[] parameters;
 
         public override void OnStateEnter(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
         {
             if (eventType == AnimatorStateEvent.OnStateEnter)
             {
-                EventManager.PostEvent(new AnimatorStateEventArguments(eventTag, animator, stateInfo, layerIndex));
+                EventManager.PostEvent(new AnimatorStateEventArguments(animator, stateInfo, layerIndex, eventTag, controlAction, parameters));
             }
         }
 
@@ -31,7 +34,7 @@ namespace FMODUnityTools
         {
             if (eventType == AnimatorStateEvent.OnStateUpdate)
             {
-                EventManager.PostEvent(new AnimatorStateEventArguments(eventTag, animator, stateInfo, layerIndex));
+                EventManager.PostEvent(new AnimatorStateEventArguments(animator, stateInfo, layerIndex, eventTag, controlAction, parameters));
             }
         }
 
@@ -39,7 +42,7 @@ namespace FMODUnityTools
         {
             if (eventType == AnimatorStateEvent.OnStateExit)
             {
-                EventManager.PostEvent(new AnimatorStateEventArguments(eventTag, animator, stateInfo, layerIndex));
+                EventManager.PostEvent(new AnimatorStateEventArguments(animator, stateInfo, layerIndex, eventTag, controlAction, parameters));
             }
         }
     }

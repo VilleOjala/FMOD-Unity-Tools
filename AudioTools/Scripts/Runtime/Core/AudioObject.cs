@@ -202,6 +202,11 @@ namespace FMODUnityTools
                 var args = (ControlActionEventArguments)eventArgs;
                 Control(args.controlAction, args.parameters);
             }
+            else if (eventArgs is AnimatorStateEventArguments)
+            {
+                var args = (AnimatorStateEventArguments)eventArgs;
+                Control(args.controlAction, args.parameters);
+            }
         }
 
         public void SetLocalParameters(params ParamRef[] parameters)
