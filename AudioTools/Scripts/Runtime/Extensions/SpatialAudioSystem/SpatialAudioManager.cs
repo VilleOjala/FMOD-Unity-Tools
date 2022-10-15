@@ -9,7 +9,7 @@ using FMODUnity;
 
 namespace FMODUnityTools
 {
-    [AddComponentMenu("FMOD-Unity-Tools/Extensions/Spatial Audio System/Spatial Audio Manager")]
+    [AddComponentMenu("FMOD Unity Tools/Extensions/Spatial Audio System/Spatial Audio Manager")]
     public class SpatialAudioManager : MonoBehaviour
     {
         #region Declarations & Initializations
