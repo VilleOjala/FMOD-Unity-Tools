@@ -9,7 +9,7 @@ using FMODUnity;
 
 namespace FMODUnityTools
 {
-    [AddComponentMenu("Audio Tools/Extensions/Reverb Zone System/Reverb Blend Zone")]
+    [AddComponentMenu("FMOD Unity Tools/Extensions/Reverb Zone System/Reverb Blend Zone")]
     public class ReverbBlendZone : MonoBehaviour
     {
         [ParamRef]
