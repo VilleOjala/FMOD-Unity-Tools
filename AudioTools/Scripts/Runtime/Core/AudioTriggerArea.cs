@@ -19,7 +19,7 @@ namespace FMODUnityTools
     [AddComponentMenu("FMOD Unity Tools/Core/Audio Trigger Area")]
     public class AudioTriggerArea : MonoBehaviour
     {
-        private enum TriggererType
+        public enum TriggererType
         {
             None,
             Listener, 
@@ -30,9 +30,10 @@ namespace FMODUnityTools
 
         [SerializeField]
         private TriggererType triggererType = TriggererType.Listener;
+        public TriggererType Triggerer { get => triggererType; } //TODO Naming
 
-        [SerializeField]
-        private LayerMask layerMask;
+        [HideInInspector]
+        public LayerMask layerMask;
         private int triggerCounter;
         private bool listenerInside;
         public Action<TriggerEventType> Triggered;

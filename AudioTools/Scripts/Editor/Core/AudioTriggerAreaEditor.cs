@@ -17,10 +17,25 @@ namespace FMODUnityTools
 
         private bool toggleState = true;
 
+        SerializedProperty layerMask;
+
+        private void OnEnable()
+        {
+            layerMask = serializedObject.FindProperty("layerMask");
+        }
+
         public override void OnInspectorGUI()
         {
             DrawDefaultInspector();
             var targetScript = target as AudioTriggerArea;
+            serializedObject.Update();
+
+            var triggererType = targetScript.Triggerer;
+
+            if (triggererType == AudioTriggerArea.TriggererType.LayerMask)
+            {
+                EditorGUILayout.PropertyField(layerMask);
+            }
             
             EditorGUILayout.Space();
             EditorGUILayout.BeginHorizontal();
