@@ -5,31 +5,21 @@ Copyright 2022, Ville Ojala
 
 DESCRIPTION
 
-A synergistic set of audio implementation tools for the interface of Unity game engine and FMOD Studio audio middleware.
+A synergistic set of audio implementation tools for the interface of Unity game engine and FMOD audio middleware.
 
 - Assorted triggering, playback and randomization features
-- Integration with various Unity subsystems such as Timeline, Animator and Animation Clips etc..
-- Third person footstep system (compatible with animation blending)
-- Voiceover system with dialogue queuing and pacing tools
-- Ambience transition system for openings (doorways etc.)
-- Multidirectional ambience system for large sound sources (with non-additive volume)
+- Integration with various Unity subsystems (Timeline, Animator, Animation Clips etc.)
+- Ambience area system for implementing seamless door transitions and large sound sources 
 - Reverb zone system with blend areas
-- Room-portal -based sound propagation / occlusion system 
+- Third person footstep system (no animation keyframe tagging required)
+- Surface tagging and detection system (both mesh and Terrain texture -based) 
+- Voiceover system with dialogue queuing and pacing tools
+- Room-portal -based sound occlusion system 
 - Raycast-based obstruction 
-- Pause menu system
 
 DOCUMENTATION
 
-User guide:
-
-https://drive.google.com/file/d/1UHIH34kuIzzbfpLbkAzj81tHn0x49F7T/view?usp=sharing
-
-
-Additional info about the spatial audio features (propagation / occlusion / obstruction):
-
-https://drive.google.com/file/d/140Nbs2cJ5GJeMNf_92SEu92Z4GDIi1Wi/view?usp=sharin
-
-https://www.youtube.com/watch?v=7FuzJBkfzzQ
+*A major rewrite of the whole toolset was pushed on 14.10.22, which made most of the previously available documentation obsolete. I will do my best to get the documentation updated in the near future.*
 
 Third party dependencies:
 
