@@ -29,9 +29,11 @@ namespace FMODUnityTools
         private bool isInsideAmbienceArea;
 
         [SerializeField, Tooltip("Don't allow additive volume when the listener is within hearing range of multiple portal outputs. " +
-                                 "Each portal output's contribution to the total experienced volume\r\nremains relative to its distance to the listener. " +
+                                 "Each portal output's contribution to the total experienced volume remains relative to its distance to the listener. " +
                                  "Portal output event's attenuation curve has to be linear for this to work correctly.")]
         private bool usePortalOutputWeighting = true;
+
+        private const float PortalStartStopPadding = 5.0f;
 
         [SerializeField]
         private bool debugVisualizePortalOutputs;
@@ -40,9 +42,12 @@ namespace FMODUnityTools
         private class PortalOutput
         {
             public Collider portalCollider; 
-            [HideInInspector] public bool isWithinRange;
-            [HideInInspector] public float normalizedCloseness;
-            [HideInInspector] public float weight;
+            [HideInInspector] 
+            public bool isWithinRange;
+            [HideInInspector] 
+            public float normalizedCloseness;
+            [HideInInspector] 
+            public float weight;
             [HideInInspector] public Vector3 closestPosition;
             public EventInstance eventInstance;
             public SpatialAudioRoom spatialAudioRoom;
@@ -120,14 +125,17 @@ namespace FMODUnityTools
                 float distance = Vector3.Distance(listenerPosition, portalOutput.closestPosition);
                 portalOutput.weight = 1f;
                
-                if (distance <= portalOutputMaxDistance)
+                if (distance <= portalOutputMaxDistance + PortalStartStopPadding)
                 {
                     hasPortalOutputsWithinRange = true;
                     portalOutput.isWithinRange = true;
 
                     if (portalOutputMaxDistance > 0)
                     {
-                        portalOutput.normalizedCloseness = Mathf.Clamp01(1 - (distance / portalOutputMaxDistance));
+                        // Assumes that the default 'linear squared' roll-off curve is being used in the FMOD Spatializer. 
+                        // Unfortunately, there is currently no handy way of polling the curve setting at runtime, which would subsequently
+                        // allow the automatic adjustment of this equation.
+                        portalOutput.normalizedCloseness = Mathf.Pow(Mathf.Clamp01(1 - (distance / portalOutputMaxDistance)), 2f);
                         combinedNormalizedClosenesses += portalOutput.normalizedCloseness;
                     }
                 }
@@ -144,13 +152,13 @@ namespace FMODUnityTools
                     if (portalOutput == null || !portalOutput.isWithinRange)
                         continue;
 
-                    if (combinedNormalizedClosenesses > 0.001f)
+                    if (combinedNormalizedClosenesses > 0)
                     {
                         portalOutput.weight = portalOutput.normalizedCloseness / combinedNormalizedClosenesses;
                     }
                     else
                     {
-                        portalOutput.weight = 0;
+                        portalOutput.weight = 1f;
                     }
                 }
             }
@@ -246,6 +254,9 @@ namespace FMODUnityTools
                     portalOutput.eventInstance.setVolume(volume);
                     var attributes = RuntimeUtils.To3DAttributes(portalOutput.closestPosition);
                     portalOutput.eventInstance.set3DAttributes(attributes);
+
+                    // Force Spatializer min distance to zero
+                    portalOutput.eventInstance.setProperty(EVENT_PROPERTY.MINIMUM_DISTANCE, 0f);
 
                     if (SpatialAudioManager.Instance != null && portalOutput.spatialAudioRoom != null)
                     {
