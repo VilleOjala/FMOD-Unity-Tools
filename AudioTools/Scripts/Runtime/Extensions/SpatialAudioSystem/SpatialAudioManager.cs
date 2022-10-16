@@ -37,7 +37,7 @@ namespace FMODUnityTools
 
         [Tooltip("The distance at which the full amount of calculated diffraction or traversal cost will be applied to the total portal propagation cost.")]
         [Range(0.1f, 30.0f)]
-        public float maxCostDistance = 2.0f;
+        public float maxCostDistance = 0.1f;
 
         public SpatialAudioRoom[] spatialAudioRooms = new SpatialAudioRoom[0];
         public SpatialAudioPortal[] spatialAudioPortals = new SpatialAudioPortal[0];
@@ -445,7 +445,10 @@ namespace FMODUnityTools
                     CalculatePropagationCost(instancesInOtherRooms);
                 }
 
-                UpdateDebugData();
+                if (debug)
+                {
+                    UpdateDebugData();
+                }
             }
         }
 
