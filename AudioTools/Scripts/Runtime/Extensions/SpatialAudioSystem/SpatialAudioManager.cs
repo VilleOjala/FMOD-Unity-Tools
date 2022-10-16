@@ -440,7 +440,8 @@ namespace FMODUnityTools
                     // For these instances, obstruction will be calculated after the propagation cost check - provided that the obstruction mode is active 
                     // and the obtained propagation cost is under the user-set threshold level controlled by the variable "obstructionMaxPropagationCost".
                     // <- This gives the user some control over reducing possibly unnecessary raycasting.
-                    // <- A high propagation cost probably means that the room walls already block the sound at a level that makes the added obstruction calculations redundant.            
+                    // <- A high propagation cost probably means that the room walls already block the sound at a level that makes the added obstruction calculations redundant.
+                    
                     CalculatePropagationCost(instancesInOtherRooms);
                 }
 
@@ -594,6 +595,9 @@ namespace FMODUnityTools
 
         private SpatialAudioRoom FindInitialRoom(Vector3 position)
         {
+            SpatialAudioRoom room = null;
+            bool firstEntryHandled = false;
+
             for (int i = 0; i < validSpatialAudioRooms.Count; i++)
             {
                 // If the spatial audio room geometry has been set correctly the trigger collider areas of different rooms should only minimally overlap.
@@ -602,17 +606,28 @@ namespace FMODUnityTools
                 {
                     if (CheckIfPositionInsideCollider(validSpatialAudioRooms[i].colliders[j], position))
                     {
-                        return validSpatialAudioRooms[i];
+                        if (!firstEntryHandled)
+                        {
+                            firstEntryHandled = true;
+                            room = validSpatialAudioRooms[i];
+                            break;
+                        }
+                        else if (validSpatialAudioRooms[i].Priority > room.Priority)
+                        {
+                            room = validSpatialAudioRooms[i];
+                            break;
+                        }    
                     }
                 }
             }
 
-            return null;
+            return room;
         }
 
         private SpatialAudioRoom CheckForRoomChange(SpatialAudioRoom previouslyKnownRoom, Vector3 currentPosition)
         {
-            SpatialAudioRoom currentRoom;
+            SpatialAudioRoom currentRoom = null;
+            bool firstEntryHandled = false;
             var connectionOrderedRoomList = orderedConnections[previouslyKnownRoom];
 
             foreach (var room in connectionOrderedRoomList)
@@ -627,13 +642,26 @@ namespace FMODUnityTools
 
                     if (CheckIfPositionInsideCollider(collider, currentPosition))
                     {
-                        currentRoom = room;
-                        return currentRoom;
+                        if (!firstEntryHandled)
+                        {
+                            currentRoom = room;
+                            firstEntryHandled = true;
+                            break;
+                        }
+                        else if (room.Priority > currentRoom.Priority)
+                        {
+                            currentRoom = room;
+                            break;
+                        }
                     }
                 }
             }
 
-            currentRoom = FindInitialRoom(currentPosition);
+            if (currentRoom == null)
+            {
+                currentRoom = FindInitialRoom(currentPosition);
+            }
+
             return currentRoom;
         }
 
