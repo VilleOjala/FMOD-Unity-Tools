@@ -87,5 +87,43 @@ namespace FMODUnityTools
 
             return GetUnityVector(attributes.position);
         }
+
+        public static bool InitializeLocalParameterID(EventDescription eventDescription, string parameterName, ref PARAMETER_ID parameterID, bool debugPrint = true)
+        {
+            if (string.IsNullOrEmpty(parameterName))
+            {
+                if (debugPrint)
+                {
+                    Debug.LogError("Local Parameter_ID initialization failed. Provided parameter name was null or empty.");
+                }
+
+                return false;
+            }
+
+            if (!eventDescription.isValid())
+            {
+                if (debugPrint)
+                {
+                    Debug.LogError("Local Parameter_ID initialization failed. Provided EventDescription was invalid.");
+                }
+
+                return false;
+            }
+
+            var result = eventDescription.getParameterDescriptionByName(parameterName, out PARAMETER_DESCRIPTION description);
+
+            if (result != FMOD.RESULT.OK)
+            {
+                if (debugPrint)
+                {
+                    Debug.Log(result + " " + parameterName + " " + description.id);
+                }
+
+                return false;
+            }
+
+            parameterID = description.id;
+            return true;
+        }
     }
 }

@@ -16,16 +16,6 @@ namespace FMODUnityTools
 
         public static SpatialAudioManager Instance { get; private set; }
         
-        private const string ObstructionParameter = "Obstruction"; // A local parameter with exactly this name needs to created inside the FMOD Studio project.
-        PARAMETER_ID obstructionID;
-        private const int ObstructionMinValue = 0; // <- The local parameter min value needs to be set as '0' inside the FMOD Studio project. 
-        private const int ObstructionMaxValue = 1; //  <- The local parameter max value needs to be set as '1' inside the FMOD Studio project.
-
-        private const string PropagationCostParameter = "PropagationCost";        
-        PARAMETER_ID propagationID;    
-        private const int CostMinValue = 0; // <- The local parameter min value needs to be set as '0' inside the FMOD Studio. 
-        private const int CostMaxValue = 1; //  <- The local parameter max value needs to be set as '1' inside the FMOD Studio.
-
         public ActiveModes activeModes;
         public DebugDrawModes debugDrawModes;
 
@@ -47,7 +37,7 @@ namespace FMODUnityTools
 
         [Tooltip("The distance at which the full amount of calculated diffraction or traversal cost will be applied to the total portal propagation cost.")]
         [Range(0.1f, 30.0f)]
-        public float maxCostDistance = 8.0f;
+        public float maxCostDistance = 2.0f;
 
         public SpatialAudioRoom[] spatialAudioRooms = new SpatialAudioRoom[0];
         public SpatialAudioPortal[] spatialAudioPortals = new SpatialAudioPortal[0];
@@ -105,11 +95,18 @@ namespace FMODUnityTools
         // The experimental mode is for emitter virtual position calculation testing to make sound appear to be eminating from the directions of openings
         // <- FMOD does not currently support dynamic multipositioning of event instances (the transceiver plugin is not really suitable)
         // Emitter max distance scaling is not used in the experimental mode
-        private bool experimentalMode = false; 
+        private bool experimentalMode = false;
+
+        [SerializeField]
+        private bool debug = false;
+
+        [SerializeField]
+        private List<string> debugData = new List<string>();
 
         [System.Flags]
         public enum ActiveModes
         {
+            Nothing,
             PropagationCost,
             Obstruction
         }
@@ -117,6 +114,7 @@ namespace FMODUnityTools
         [System.Flags]
         public enum DebugDrawModes
         {
+            Nothing,
             PropationCost,
             Obstruction
         }
@@ -129,6 +127,8 @@ namespace FMODUnityTools
             public float maxDistance;
             public SpatialAudioRoom currentRoom;
             public SpatialAudioRoom fixedRoom;
+            public PARAMETER_ID propagationID;
+            public PARAMETER_ID obstructionID;
         }
 
         private class SpatialAudioNode
@@ -226,28 +226,7 @@ namespace FMODUnityTools
                             }
                         }
                     }
-                }
-             
-                var result = RuntimeManager.StudioSystem.getParameterDescriptionByName(PropagationCostParameter, out PARAMETER_DESCRIPTION desc);
-
-                if (result != FMOD.RESULT.OK)
-                {
-                    Debug.LogError(result);
-                }
-
-                propagationID = desc.id;          
-            }
-
-            if (activeModes.HasFlag(ActiveModes.Obstruction))
-            {
-                var result = RuntimeManager.StudioSystem.getParameterDescriptionByName(ObstructionParameter, out PARAMETER_DESCRIPTION desc);
-
-                if (result != FMOD.RESULT.OK)
-                {
-                    Debug.LogError(result);
-                }
-
-                obstructionID = desc.id;
+                }                  
             }
 
             managerInitialized = true;
@@ -312,18 +291,21 @@ namespace FMODUnityTools
             roomAwareInstance.maxDistance = maxDistance;
             roomAwareInstance.currentRoom = fixedRoom;
             roomAwareInstance.fixedRoom = fixedRoom;
-      
-            // Set propagation cost and osbtruction (if applicable) to max value, before the first correct values are calculated on LateUpdate.
-            if (Instance != null)
-            {
-                if (Instance.activeModes.HasFlag(ActiveModes.PropagationCost))
-                {
-                    SetParameterValue(propagationID, CostMaxValue, eventInstance);
-                }
 
-                if (Instance.activeModes.HasFlag(ActiveModes.Obstruction))
+            // Set propagation cost and osbtruction (if applicable) to max value, before the first correct values are calculated on LateUpdate.
+            if (activeModes.HasFlag(ActiveModes.PropagationCost))
+            {
+                if (HelperMethods.InitializeLocalParameterID(eventDescription, Parameters.PropagationCostParameter, ref roomAwareInstance.propagationID))
                 {
-                    SetParameterValue(obstructionID, ObstructionMaxValue, eventInstance);
+                    SetParameterValue(roomAwareInstance.propagationID, Parameters.PropagationCostMaxValue, eventInstance);
+                }
+            }
+
+            if (activeModes.HasFlag(ActiveModes.Obstruction))
+            {
+                if (HelperMethods.InitializeLocalParameterID(eventDescription, Parameters.PropagationCostParameter, ref roomAwareInstance.propagationID))
+                {
+                    SetParameterValue(roomAwareInstance.obstructionID, Parameters.ObstructionMaxValue, eventInstance);
                 }
             }
 
@@ -384,8 +366,10 @@ namespace FMODUnityTools
 
         void LateUpdate()
         {
-            if (!managerInitialized) 
+            if (!managerInitialized)
+            {
                 return;
+            }
 
             timer += Time.deltaTime;
 
@@ -398,7 +382,6 @@ namespace FMODUnityTools
 
                 if (!foundPlayerPosition)
                 {
-                    //TODO: Handle somehow?
                     return;
                 }
 
@@ -422,7 +405,7 @@ namespace FMODUnityTools
 
                 if (activeModes.HasFlag(ActiveModes.PropagationCost) && currentPlayerRooms != null && currentPlayerRooms.Count > 0)
                 {
-                    currentPlayerRoom = currentPlayerRooms[0];
+                    currentPlayerRoom = GetHighestPriorityRoom();
 
                     // Find the current room for the registree.
                     // Put aside the registered instances for which the room look-up failed.
@@ -460,7 +443,42 @@ namespace FMODUnityTools
                     // <- A high propagation cost probably means that the room walls already block the sound at a level that makes the added obstruction calculations redundant.            
                     CalculatePropagationCost(instancesInOtherRooms);
                 }
+
+                UpdateDebugData();
             }
+        }
+
+        private void UpdateDebugData()
+        {
+#if UNITY_EDITOR
+
+            debugData.Clear();
+
+            foreach (var item in registeredInstances)
+            {
+                if (item != null &&  item.eventInstance.isValid())
+                {
+                    float propagationCost = 0;
+                    float obstruction = 0;
+                    item.eventInstance.getDescription(out EventDescription eventDescription);
+                    eventDescription.getPath(out string path);
+                    string name = System.IO.Path.GetFileNameWithoutExtension(path);
+
+                    if (activeModes.HasFlag(ActiveModes.PropagationCost))
+                    {
+                        item.eventInstance.getParameterByID(item.propagationID, out propagationCost);
+                    }   
+                    
+                    if (activeModes.HasFlag(ActiveModes.Obstruction))
+                    {
+                        item.eventInstance.getParameterByID(item.obstructionID, out obstruction);
+                    }
+
+                    string info = name + ", PropagationCost: " + propagationCost + ", Obstruction: " + obstruction;
+                    debugData.Add(info);
+                }
+            }
+#endif
         }
 
         private void CheckRegisteredInstanceValidity()
@@ -494,6 +512,32 @@ namespace FMODUnityTools
                 instance.previousPosition = instance.currentPosition;
                 instance.currentPosition = HelperMethods.GetEventInstancePosition(instance.eventInstance);
             }
+        }
+
+        private SpatialAudioRoom GetHighestPriorityRoom()
+        {
+            SpatialAudioRoom prioritizedRoom = null;
+            bool firstEntryProcessed = false;
+
+            for (int i = 0; i < currentPlayerRooms.Count; i++)
+            {
+                var room = currentPlayerRooms[i];
+
+                if (room == null)
+                    continue;
+
+                if (!firstEntryProcessed)
+                {
+                    prioritizedRoom = room;
+                    firstEntryProcessed = true;
+                }
+                else if (room.Priority > prioritizedRoom.Priority)
+                {
+                    prioritizedRoom = room;
+                }
+            }
+
+            return prioritizedRoom;
         }
 
         private void UpdateRegisteredInstanceRoom(ref List<RoomAwareInstance> instancesWithKnownRoom, ref List<RoomAwareInstance> instancesWithUnknownRoom)
@@ -664,7 +708,7 @@ namespace FMODUnityTools
                 if (instance == null)
                     continue;
 
-                CalculateAndSetObstruction(instance.eventInstance, instance.currentPosition);
+                CalculateAndSetObstruction(instance.eventInstance, instance.currentPosition, instance.obstructionID);
             }
         }
 
@@ -678,11 +722,11 @@ namespace FMODUnityTools
                 if (instance == null)
                     continue;
 
-                CalculateAndSetObstruction(instance.eventInstance, instance.currentPosition);
+                CalculateAndSetObstruction(instance.eventInstance, instance.currentPosition, instance.obstructionID);
             }
         }
 
-        private void CalculateAndSetObstruction(EventInstance eventInstance, Vector3 emitterPostion)
+        private void CalculateAndSetObstruction(EventInstance eventInstance, Vector3 emitterPostion, PARAMETER_ID obstructionID)
         {
             bool debug = false;
 
@@ -708,7 +752,7 @@ namespace FMODUnityTools
                 if (instance == null)
                     continue;
 
-                SetParameterValue(obstructionID, ObstructionMinValue, instance.eventInstance);
+                SetParameterValue(instance.obstructionID, Parameters.ObstructionMinValue, instance.eventInstance);
             }
         }
 
@@ -722,7 +766,7 @@ namespace FMODUnityTools
                 if (instance == null)
                     continue;
 
-                SetParameterValue(obstructionID, ObstructionMinValue, instance.eventInstance);
+                SetParameterValue(instance.obstructionID, Parameters.ObstructionMinValue, instance.eventInstance);
             }
         }
 
@@ -766,7 +810,7 @@ namespace FMODUnityTools
                 {
                     if (activeModes.HasFlag(ActiveModes.Obstruction))
                     {
-                        if (obstructionCheckThreshold >= CostMaxValue)
+                        if (obstructionCheckThreshold >= Parameters.PropagationCostMaxValue)
                         {
                             CheckObstruction(instance);
                         }
@@ -775,7 +819,7 @@ namespace FMODUnityTools
                             ResetObstruction(instance);
                         }
                     }
-                    SetParameterValue(propagationID, CostMaxValue, instance.eventInstance);
+                    SetParameterValue(instance.propagationID, Parameters.PropagationCostMaxValue, instance.eventInstance);
                     continue;
                 }
 
@@ -842,7 +886,7 @@ namespace FMODUnityTools
                 }
 
                 // Assign the calculated propagation cost to the EventInstance.
-                SetParameterValue(propagationID, lowestPropagationCost, instance.eventInstance);
+                SetParameterValue(instance.propagationID, lowestPropagationCost, instance.eventInstance);
 
                 if (experimentalMode) 
                     continue;
@@ -863,7 +907,7 @@ namespace FMODUnityTools
                 if (instance == null)
                     continue;
 
-                SetParameterValue(propagationID, CostMinValue, instance.eventInstance);
+                SetParameterValue(instance.propagationID, Parameters.PropagationCostMinValue, instance.eventInstance);
 
                 if (experimentalMode)
                     continue;

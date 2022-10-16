@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Assertions.Must;
 
 namespace FMODUnityTools
 {
@@ -18,6 +19,10 @@ namespace FMODUnityTools
         public string roomName;
         public AudioTriggerArea triggerArea;
 
+        [SerializeField]
+        private int priority;
+        public int Priority { get { return priority; } }
+
         [HideInInspector]
         public List<Collider> colliders;
         public List<RoomConnection> roomConnections = new List<RoomConnection>();
@@ -30,6 +35,14 @@ namespace FMODUnityTools
         }
 
         private bool roomAlreadyInitalized = false;
+
+        private void Awake()
+        {
+            if (triggerArea != null)
+            {
+                triggerArea.Triggered += TriggeredHandler;
+            }
+        }
 
         public bool InitializeRoom(SpatialAudioManager caller)
         {
@@ -120,7 +133,7 @@ namespace FMODUnityTools
                     roomConnection.connectingPortals[j].SetConnectedRoom(this);
                 }
             }
-            triggerArea.Triggered += TriggeredHandler;
+
             return true;
         }
 
