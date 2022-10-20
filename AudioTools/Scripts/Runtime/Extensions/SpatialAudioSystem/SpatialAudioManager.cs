@@ -301,7 +301,7 @@ namespace FMODUnityTools
 
             if (activeModes.HasFlag(ActiveModes.Obstruction))
             {
-                if (HelperMethods.InitializeLocalParameterID(eventDescription, Parameters.PropagationCostParameter, ref roomAwareInstance.propagationID))
+                if (HelperMethods.InitializeLocalParameterID(eventDescription, Parameters.ObstructionParameter, ref roomAwareInstance.obstructionID))
                 {
                     SetParameterValue(roomAwareInstance.obstructionID, Parameters.ObstructionMaxValue, eventInstance);
                 }
@@ -691,7 +691,7 @@ namespace FMODUnityTools
         }
 
         private void SetParameterValue(PARAMETER_ID parameterID, float parameterValue, EventInstance eventInstance) 
-        {    
+        {
             var result = eventInstance.setParameterByID(parameterID, parameterValue);
 
             if (result != FMOD.RESULT.OK)
