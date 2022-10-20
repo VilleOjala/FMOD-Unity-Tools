@@ -5,7 +5,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using FMOD.Studio;
-using FMODUnity;
+using System.Linq;
 
 namespace FMODUnityTools
 {
@@ -18,35 +18,29 @@ namespace FMODUnityTools
         
         public ActiveModes activeModes;
         public DebugDrawModes debugDrawModes;
-
         public LayerMask obstructionLayerMask;
         public QueryTriggerInteraction obstructionQueryTriggers = QueryTriggerInteraction.Ignore;
 
         [SerializeField, Tooltip("Collider to ignore when checking for obstruction.")]
         private Collider ignoreSelfCollider;
         public Collider IgnoreSelfCollider { get => ignoreSelfCollider; set => ignoreSelfCollider = value; }
-
         public bool requireObstructionTag = true;
-
-        [Range(0.0f, 1.0f), Tooltip("The maximum amount of propagation cost at which obstruction check is still performed when the emitter and listener are in different rooms.")]
-        public float obstructionCheckThreshold = 0.0f;
 
         [Tooltip("Controls the overall width of the raycast pattern used in the obstruction mode.")]
         [Range(0.0f, 10.0f)]
         public float obstructionRaycastSpread = 1.3f;
 
-        [Tooltip("The distance at which the full amount of calculated diffraction or traversal cost will be applied to the total portal propagation cost.")]
         [Range(0.1f, 30.0f)]
         public float maxCostDistance = 0.1f;
 
         public SpatialAudioRoom[] spatialAudioRooms = new SpatialAudioRoom[0];
         public SpatialAudioPortal[] spatialAudioPortals = new SpatialAudioPortal[0];
         private List<SpatialAudioRoom> validSpatialAudioRooms = new List<SpatialAudioRoom>();
+        private List<RoomPair> roomPairs = new List<RoomPair>();
         private List<SpatialAudioRoom> currentPlayerRooms = new List<SpatialAudioRoom>();
         private SpatialAudioRoom currentPlayerRoom;
         private List<RoomAwareInstance> registeredInstances = new List<RoomAwareInstance>();
         private Vector3 playerPosition;
-        private SpatialAudioNode playerNode = new SpatialAudioNode() { isPlayer = true };
 
         /*
         When the level starts, each Spatial Audio Room will be set as a starting room and all the directly or indirectly reachable rooms from it are then searched for.
@@ -61,18 +55,11 @@ namespace FMODUnityTools
         */
         private Dictionary<SpatialAudioRoom, List<SpatialAudioRoom>> orderedConnections = new Dictionary<SpatialAudioRoom, List<SpatialAudioRoom>>();
 
-        //  During the propagation cost calculations having these relations already pre-stored allows for faster sorting of raycast hit data.
-        // <- i.e. not having to do a bunch of 'GetComponent' calls etc.
-        private Dictionary<BoxCollider, SpatialAudioPortal> colliderToPortalData = new Dictionary<BoxCollider, SpatialAudioPortal>();
-
-        // Used for a fast node lookup during the propagation cost calculations. 
-        private Dictionary<SpatialAudioPortal, SpatialAudioNode> portalToNodeData = new Dictionary<SpatialAudioPortal, SpatialAudioNode>();
-
-        // If the 'Require Obstruction Tag' -mode is active, the Spatial Audio Obstruction Tags populate this list with their associated colliders. 
+        // If the 'Require Obstruction Tag' -mode is active, the SpatialAudioObstructionTag instances populate this list with their associated colliders. 
         private HashSet<Collider> obstructingColliders = new HashSet<Collider>();
 
-        // The maximum number of rooms that a sound route can pass through before it is automatically terminated. 
-        private const int CheckLevelLimit = 6;
+        // The maximum number of rooms that will be visited when searching for routes between two rooms.
+        private const int MaxVisitedRooms = 8;
 
         private List<RoomAwareInstance> instancesWithKnownRoom = new List<RoomAwareInstance>();
         private List<RoomAwareInstance> instancesWithUnknownRoom = new List<RoomAwareInstance>();
@@ -80,28 +67,29 @@ namespace FMODUnityTools
         private List<RoomAwareInstance> instancesInPlayerRoom = new List<RoomAwareInstance>();
         private List<RoomAwareInstance> instancesInOtherRooms = new List<RoomAwareInstance>();
         private Dictionary<RoomAwareInstance, float> instanceToPlayerDistances = new Dictionary<RoomAwareInstance, float>();
+        private List<Node> routeNodes = new List<Node>();
+        private List<Node> debugDrawRouteNodes = new List<Node>();
+        Dictionary<SpatialAudioPortal, float> distancesThroughArrivalPortals = new Dictionary<SpatialAudioPortal, float>();
+        private Dictionary<SpatialAudioPortal, Vector3> portalClosestPoints = new Dictionary<SpatialAudioPortal, Vector3>();
 
         // When calculating the diffraction angle for a given portal, the angle will be set to zero if the magnitude of either direction vector is below this value.
         // This is done to prevent the bugs/edge cases in angle calculations when the player or an emitter is crossing a room boundary. 
         // <- Using very short direction vectors may cause sudden unwanted jumps/artefact in the calculated diffraction values.
-        private float minimumVectorMagnitude = 0.05f;
+        private const float MinimumVectorMagnitude = 0.05f;
 
-        public float CheckInterval { get; set; } = 0.1f;
-        private float timer = 0.0f;
-        private bool forceCheckNextLateUpdate = false;
         private bool managerInitialized = false;
-
-        // Currently, the tool only works properly when this is set as false.
-        // The experimental mode is for emitter virtual position calculation testing to make sound appear to be eminating from the directions of openings
-        // <- FMOD does not currently support dynamic multipositioning of event instances (the transceiver plugin is not really suitable)
-        // Emitter max distance scaling is not used in the experimental mode
-        private bool experimentalMode = false;
 
         [SerializeField]
         private bool debug = false;
 
         [SerializeField]
         private List<string> debugData = new List<string>();
+
+        // In contrast to Wwise, FMOD does not currently include API functionality for multipositioning EventInstances dynamically.
+        // Nevertheless, this setting is for visualizing from which direction / distance a sound should be heard emanating from when it arrives to
+        // the listener through portal openingss.
+        // If a multipositioning feature is added to FMOD sometime in the future, it is easy to modify this tool to take advantage of it.
+        private bool visualizeEmitterVirtualPositions = false;
 
         [System.Flags]
         public enum ActiveModes
@@ -131,25 +119,71 @@ namespace FMODUnityTools
             public PARAMETER_ID obstructionID;
         }
 
-        private class SpatialAudioNode
+        private class RoomPair
         {
-            public bool isInstance = false;
-            public RoomAwareInstance roomAwareInstance;
-            public SpatialAudioPortal nodePortal;
-            public bool isPlayer = false;
+            public SpatialAudioRoom roomA;
+            public SpatialAudioRoom roomB;
+            public List<List<SpatialAudioPortal>> routeAlternatives = new List<List<SpatialAudioPortal>>();
+
+            public RoomPair() { }
+
+            public RoomPair(SpatialAudioRoom roomA, SpatialAudioRoom roomB, List<List<SpatialAudioPortal>> routeAlternatives)
+            {
+                this.roomA = roomA;
+                this.roomB = roomB;
+                this.routeAlternatives = routeAlternatives;
+            }
+
+            public bool IsMatch(SpatialAudioRoom roomA, SpatialAudioRoom roomB)
+            {
+                if (this.roomA == null || this.roomB == null || roomA == null || roomB == null)
+                    return false;
+
+                if (this.roomA == roomA && this.roomB == roomB)
+                    return true;
+                else
+                    return false;
+            }
         }
 
-        private class SpatialAudioRoute
+        private class Route
         {
-            public List<SpatialAudioNode> routePoints = new List<SpatialAudioNode>();
-            public HashSet<SpatialAudioRoom> visitedRooms = new HashSet<SpatialAudioRoom>();
-            public SpatialAudioNode cacheLastNode;
-            public float routeLength;
+            public List<SpatialAudioRoom> visitedRooms = new List<SpatialAudioRoom>();
+            public List<SpatialAudioPortal> routePortals = new List<SpatialAudioPortal>();
+            public SpatialAudioRoom newestFoundRoom = null;
 
-            //Icluded only for the "experimental mode" testing purposes
-            public bool arrivedThroughOpening = false;
-            public Vector3 arrivalPoint;
-            public Vector3 virtualPosition;
+            public Route() { }
+
+            public Route(Route route)
+            {
+                visitedRooms = new List<SpatialAudioRoom>(route.visitedRooms);
+                routePortals = new List<SpatialAudioPortal>(route.routePortals);
+                newestFoundRoom = route.newestFoundRoom;
+            }
+        }
+
+        private struct Node
+        {
+            public enum NodeType { Emitter, Wall, Opening, Listener };
+
+            public NodeType nodeType;
+            public Vector3 position;
+
+            // Only relevant if nodeType == NodeType.Opening
+            public float portalClosednessCost;
+            public float traversalMaxCost;
+
+            // Only relevant if nodeType == NodeType.Wall
+            public float wallOcclusion;
+
+            public Node(NodeType nodeType, Vector3 position, float portalClosednessCost = 0, float traversalMaxCost = 0, float wallOcclusion = 0)
+            {
+                this.nodeType = nodeType;
+                this.position = position;
+                this.portalClosednessCost = portalClosednessCost;
+                this.traversalMaxCost = traversalMaxCost;
+                this.wallOcclusion = wallOcclusion;
+            }
         }
 
         void Awake()
@@ -169,74 +203,37 @@ namespace FMODUnityTools
 
             if (activeModes.HasFlag(ActiveModes.PropagationCost))
             {
-                for (int i = 0; i < spatialAudioRooms.Length; i++)
+                if (spatialAudioPortals == null)
                 {
-                    SpatialAudioRoom room = spatialAudioRooms[i];
+                    Debug.LogError("The 'spatialAudioPortals' array is null");
+                    return;
+                }
 
-                    if (room != null)
+                foreach (var room in spatialAudioRooms)
+                {
+                    if (room == null)
+                        continue;
+
+                    if (room.InitializeRoom(this))
                     {
-                        bool roomIsValid = room.InitializeRoom(this);
-
-                        if (roomIsValid)
-                        {
-                            validSpatialAudioRooms.Add(room);
-                        }
+                        validSpatialAudioRooms.Add(room);
                     }
                 }
 
-                for (int i = 0; i < validSpatialAudioRooms.Count; i++)
+                foreach (var room in validSpatialAudioRooms)
                 {
-                    var connectedRooms = FindAllConnectedRooms(validSpatialAudioRooms[i]);
+                    var connectedRooms = FindAllConnectedRooms(room);
 
-                    if (connectedRooms != null && connectedRooms.Count > 0)
+                    if (connectedRooms.Count > 0)
                     {
-                        orderedConnections.Add(validSpatialAudioRooms[i], connectedRooms);
+                        orderedConnections.Add(room, connectedRooms);
                     }
-                }
+                }              
 
-                for (int i = 0; i < spatialAudioPortals.Length; i++)
-                {
-                    SpatialAudioPortal portal = spatialAudioPortals[i];
-
-                    if (portal != null)
-                    {
-                        if (portal.portalCollider != null)
-                        {
-                            colliderToPortalData.Add(portal.portalCollider, portal);
-
-                            if (!portalToNodeData.ContainsKey(portal))
-                            {
-                                var portalNode = CreatePortalNode(portal);
-                                portalToNodeData.Add(portal, portalNode);
-                            }                
-                        }
-                        else
-                        {
-                            portal.portalCollider = portal.gameObject.GetComponent<BoxCollider>();
-
-                            if (portal.portalCollider != null)
-                            {
-                                colliderToPortalData.Add(portal.portalCollider, portal);
-
-                                if (!portalToNodeData.ContainsKey(portal))
-                                {
-                                    var portalNode = CreatePortalNode(portal);
-                                    portalToNodeData.Add(portal, portalNode);
-                                }
-                            }
-                        }
-                    }
-                }                  
+                InitializeRoomPairRouteAlternatives();
             }
 
             managerInitialized = true;
-        }
-
-        private SpatialAudioNode CreatePortalNode(SpatialAudioPortal portal)
-        {
-            var portalNode = new SpatialAudioNode();
-            portalNode.nodePortal = portal;
-            return portalNode;
         }
 
         private List<SpatialAudioRoom> FindAllConnectedRooms(SpatialAudioRoom startingRoom)
@@ -272,6 +269,7 @@ namespace FMODUnityTools
 
             return connectionList;
         }
+
         #endregion
 
         #region Public Methods
@@ -310,7 +308,6 @@ namespace FMODUnityTools
             }
 
             registeredInstances.Add(roomAwareInstance);
-            forceCheckNextLateUpdate = true;
         }
 
         public void AddCurrentPlayerRoom(SpatialAudioRoom room)
@@ -360,6 +357,7 @@ namespace FMODUnityTools
 
             return false;
         }
+
         #endregion
 
         #region Registered Instance Update
@@ -367,88 +365,64 @@ namespace FMODUnityTools
         void LateUpdate()
         {
             if (!managerInitialized)
-            {
                 return;
+
+            bool foundPlayerPosition = HelperMethods.TryGetListenerPosition(out playerPosition);
+
+            if (!foundPlayerPosition)
+                return;
+
+            // Check that a registered instance is still playing and get its positional data.
+            CheckRegisteredInstanceValidity();
+            UpdateInstancePositionalData();
+
+            // Find registered instances that are within hearing distance from the player.
+            // <- In other words, we don't want to do spatial audio calculations for sounds that are inaudible anyway.
+            // If the propagation cost mode is active then also store the calculated player-to-emitter distances, 
+            // since they will be again needed later on during the check protocol.
+            audibleInstances.Clear();
+            instanceToPlayerDistances.Clear();
+            CheckInstanceAudibility(ref audibleInstances, ref instanceToPlayerDistances);
+
+            if (activeModes.HasFlag(ActiveModes.PropagationCost) && currentPlayerRooms != null && currentPlayerRooms.Count > 0)
+            {
+                currentPlayerRoom = GetHighestPriorityRoom();
+
+                // Find the current room for the registree.
+                // Put aside the registered instances for which the room look-up failed.
+                // If the current room was known previously, a new room check is only performed if the position of the registred instance has changed.
+                instancesWithKnownRoom.Clear();
+                instancesWithUnknownRoom.Clear();
+                UpdateRegisteredInstanceRoom(ref instancesWithKnownRoom, ref instancesWithUnknownRoom);
+
+                // If the registree room cannot be determined, we will remove all propagation cost and obsruction from it.
+                // <- Lesser evil than potentially missing hearing some vital audio, such as dialogue etc. 
+                ResetPropagationCost(instancesWithUnknownRoom);
+                if (activeModes.HasFlag(ActiveModes.Obstruction))
+                {
+                    ResetObstruction(instancesWithUnknownRoom);
+                }
+
+                // Split the obtained relevant registered instances to those which are in the current player room and to those located in other rooms.
+                instancesInPlayerRoom.Clear();
+                instancesInOtherRooms.Clear();
+                DivideInstancesByPlayerRelativePosition(ref instancesWithKnownRoom, ref instancesInPlayerRoom, ref instancesInOtherRooms, currentPlayerRoom);
+
+                // Remove propagation cost from registered instances that are in the same room with the player, which may have been applied during the previous check cycle.
+                ResetPropagationCost(instancesInPlayerRoom);
+
+                // Calculate propagation cost for instances in other rooms.                  
+                CalculatePropagationCosts(instancesInOtherRooms);
             }
 
-            timer += Time.deltaTime;
-
-            if (timer > CheckInterval || forceCheckNextLateUpdate)
+            if (activeModes.HasFlag(ActiveModes.Obstruction))
             {
-                timer = 0.0f;
-                forceCheckNextLateUpdate = false;
+                CheckObstruction(audibleInstances);
+            }
 
-                bool foundPlayerPosition = HelperMethods.TryGetListenerPosition(out playerPosition);
-
-                if (!foundPlayerPosition)
-                {
-                    return;
-                }
-
-                // Check that a registered instance is still playing and get its positional data.
-                CheckRegisteredInstanceValidity();
-                UpdateInstancePositionalData();
-
-                // Find registered instances that are within hearing distance from the player.
-                // <- In other words, we don't want to do spatial audio calculations for sounds that are inaudible anyway.
-                // If the propagation cost mode is active then also store the calculated player-to-emitter distances, 
-                // since they will be again needed later on during the check protocol.
-                audibleInstances.Clear();
-                instanceToPlayerDistances.Clear();
-                CheckInstanceAudibility(ref audibleInstances, ref instanceToPlayerDistances);
-
-                // If only the obstruction mode is active, check for obstruction for all audible registred instances.
-                if (!activeModes.HasFlag(ActiveModes.PropagationCost) && activeModes.HasFlag(ActiveModes.Obstruction))
-                {
-                    CheckObstruction(audibleInstances);
-                }
-
-                if (activeModes.HasFlag(ActiveModes.PropagationCost) && currentPlayerRooms != null && currentPlayerRooms.Count > 0)
-                {
-                    currentPlayerRoom = GetHighestPriorityRoom();
-
-                    // Find the current room for the registree.
-                    // Put aside the registered instances for which the room look-up failed.
-                    // If the current room was known previously, a new room check is only performed if the position of the registred instance has changed.
-                    instancesWithKnownRoom.Clear();
-                    instancesWithUnknownRoom.Clear();
-                    UpdateRegisteredInstanceRoom(ref instancesWithKnownRoom, ref instancesWithUnknownRoom);
-
-                    // If the registree room cannot be determined, we will remove all propagation cost and obsruction from it.
-                    // <- Lesser evil than potentially missing hearing some vital audio, such as dialogue etc. 
-                    ResetPropagationCost(instancesWithUnknownRoom);
-                    if (activeModes.HasFlag(ActiveModes.Obstruction))
-                    {
-                        ResetObstruction(instancesWithUnknownRoom);
-                    }
-
-                    // Split the obtained relevant registered instances to those which are in the current player room and to those located in other rooms.
-                    instancesInPlayerRoom.Clear();
-                    instancesInOtherRooms.Clear();
-                    DivideInstancesByPlayerRelativePosition(ref instancesWithKnownRoom, ref instancesInPlayerRoom, ref instancesInOtherRooms, currentPlayerRoom);
-
-                    // Remove propagation cost from registered instances that are in the same room with the player, which may have been applied during the previous check cycle.
-                    ResetPropagationCost(instancesInPlayerRoom);
-
-                    // Calculate obstruction for instances located in the player room if the obstruction mode is active.
-                    if (activeModes.HasFlag(ActiveModes.Obstruction))
-                    {
-                        CheckObstruction(instancesInPlayerRoom);
-                    }
-
-                    // Calculate propagation cost for instances in other rooms.
-                    // For these instances, obstruction will be calculated after the propagation cost check - provided that the obstruction mode is active 
-                    // and the obtained propagation cost is under the user-set threshold level controlled by the variable "obstructionMaxPropagationCost".
-                    // <- This gives the user some control over reducing possibly unnecessary raycasting.
-                    // <- A high propagation cost probably means that the room walls already block the sound at a level that makes the added obstruction calculations redundant.
-                    
-                    CalculatePropagationCost(instancesInOtherRooms);
-                }
-
-                if (debug)
-                {
-                    UpdateDebugData();
-                }
+            if (debug)
+            {
+                UpdateDebugData();
             }
         }
 
@@ -722,28 +696,15 @@ namespace FMODUnityTools
 
             if (result != FMOD.RESULT.OK)
             {
-                Debug.LogError(result); 
+                Debug.LogWarning(result); 
             }
         }
+
         #endregion
 
         #region Obstruction
 
         private void CheckObstruction(in List<RoomAwareInstance> instances)
-        {
-            if (instances == null)
-                return;
-
-            foreach (var instance in instances)
-            {
-                if (instance == null)
-                    continue;
-
-                CalculateAndSetObstruction(instance.eventInstance, instance.currentPosition, instance.obstructionID);
-            }
-        }
-
-        private void CheckObstruction(params RoomAwareInstance[] instances)
         {
             if (instances == null)
                 return;
@@ -773,20 +734,6 @@ namespace FMODUnityTools
             SetParameterValue(obstructionID, obstruction, eventInstance);
         }
 
-        private void ResetObstruction(params RoomAwareInstance[] instances)                
-        {
-            if (instances == null)
-                return;
-
-            foreach (var instance in instances)
-            {
-                if (instance == null)
-                    continue;
-
-                SetParameterValue(instance.obstructionID, Parameters.ObstructionMinValue, instance.eventInstance);
-            }
-        }
-
         private void ResetObstruction(List<RoomAwareInstance> instances) 
         {
             if (instances == null)
@@ -805,127 +752,255 @@ namespace FMODUnityTools
 
         #region Propagation Cost
 
-        //Reusable data structures for the "CalculatePropagationCost" -method to reduce the GC overhead.
-        private Dictionary<SpatialAudioPortal, Vector3> portalClosestPoints = new Dictionary<SpatialAudioPortal, Vector3>();
-        private List<SpatialAudioRoute> traversalRoutes = new List<SpatialAudioRoute>();
-        private Dictionary<SpatialAudioPortal, Vector3> portalHitData = new Dictionary<SpatialAudioPortal, Vector3>();
-
-        private void CalculatePropagationCost(List<RoomAwareInstance> instances)
+        private void InitializeRoomPairRouteAlternatives()
         {
-            for (int i = 0; i < instances.Count; i++)
+            for (int i = 0; i < validSpatialAudioRooms.Count; i++)
             {
-                RoomAwareInstance instance = instances[i];
-                SpatialAudioRoom instanceRoom = instance.currentRoom;
+                var roomA = validSpatialAudioRooms[i];
 
-                portalHitData.Clear();
-                UpdatePortalHitData(instance.currentPosition, playerPosition, ref portalHitData);
-                portalClosestPoints.Clear();
-                traversalRoutes.Clear();
-                // Find and store routes from the instance towards player through portals.
-                FindTraversalRoutes(instanceRoom, in portalHitData, instance.maxDistance, ref portalClosestPoints, instance, ref traversalRoutes);
-
-                // Filter out any routes that did not reach the player.
-                for (int j = traversalRoutes.Count - 1; j > -1; j--)
+                for (int j = 0; j < validSpatialAudioRooms.Count; j++)
                 {
-                    SpatialAudioRoute route = traversalRoutes[j];
-                    SpatialAudioNode lastNode = route.routePoints[route.routePoints.Count - 1];
+                    var roomB = validSpatialAudioRooms[j];
 
-                    if (!lastNode.isPlayer)
+                    if (roomA != roomB)
                     {
-                        traversalRoutes.RemoveAt(j);
+                        var routes = new List<Route>();
+
+                        foreach (var connection in roomA.roomConnections)
+                        {
+                            if (connection == null || connection.connectedRoom == null || connection.connectedRoom == roomA)
+                                continue;
+
+                            foreach (var portal in connection.connectingPortals)
+                            {
+                                if (portal == null)
+                                    continue;
+
+                                var route = new Route();
+                                route.visitedRooms.Add(roomA);
+                                route.routePortals.Add(portal);
+                                route.newestFoundRoom = connection.connectedRoom;
+                                routes.Add(route);
+                            }
+                        }
+
+                        for (int k = 0; k < routes.Count; k++)
+                        {
+                            var route = routes[k];
+
+                            while (route.newestFoundRoom != roomB && route.visitedRooms.Last() != route.newestFoundRoom && route.visitedRooms.Count <= MaxVisitedRooms)
+                            {
+                                bool existingRouteExtended = false;
+                                var roomToVisit = route.newestFoundRoom;
+                                route.visitedRooms.Add(roomToVisit);
+                                var deepCopyTemplate = new Route(route);
+
+                                foreach (var connection in roomToVisit.roomConnections)
+                                {
+                                    if (connection == null || connection.connectedRoom == null || route.visitedRooms.Contains(connection.connectedRoom))
+                                        continue;
+
+                                    foreach (var portal in connection.connectingPortals)
+                                    {
+                                        if (portal == null)
+                                            continue;
+
+                                        if (!existingRouteExtended)
+                                        {
+                                            route.routePortals.Add(portal);
+                                            route.newestFoundRoom = connection.connectedRoom;
+                                            existingRouteExtended = true;
+                                        }
+                                        else
+                                        {
+                                            var newRoute = new Route(deepCopyTemplate);
+                                            newRoute.routePortals.Add(portal);
+                                            newRoute.newestFoundRoom = connection.connectedRoom;
+                                            routes.Add(newRoute);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        var routeAlternatives = new List<List<SpatialAudioPortal>>();
+
+                        foreach (var route in routes)
+                        {
+                            if (route.newestFoundRoom == roomB)
+                            {
+                                routeAlternatives.Add(route.routePortals);
+                            }
+                        }
+
+                        var roomPair = new RoomPair(roomA, roomB, routeAlternatives);
+                        roomPairs.Add(roomPair);
                     }
                 }
+            }
+        }
 
-                // If no route to the player was found, apply full propagation cost.
-                if (traversalRoutes.Count < 1)
+        private void CalculatePropagationCosts(List<RoomAwareInstance> instances)
+        {
+            foreach (var instance in instances)
+            {
+                Vector3 instancePosition = instance.currentPosition;
+                float directRouteLength = instanceToPlayerDistances[instance];
+                bool foundPair = TryGetMatchingRoomPair(instance.currentRoom, currentPlayerRoom, out RoomPair roomPair);
+
+                if (!foundPair || roomPair.routeAlternatives.Count == 0)
                 {
-                    if (activeModes.HasFlag(ActiveModes.Obstruction))
-                    {
-                        if (obstructionCheckThreshold >= Parameters.PropagationCostMaxValue)
-                        {
-                            CheckObstruction(instance);
-                        }
-                        else
-                        {
-                            ResetObstruction(instance);
-                        }
-                    }
-                    SetParameterValue(instance.propagationID, Parameters.PropagationCostMaxValue, instance.eventInstance);
+                    SetParameterValue(instance.propagationID, Parameters.PropagationCostMaxValue, instance.eventInstance); 
                     continue;
                 }
 
-                // EXPERIMENTING WITH THE EMITTER VIRTUAL POSITION CALCULATIONS ->     
-                if (experimentalMode)
+                portalClosestPoints.Clear();
+                GetClosestPointsOnPortals(instancePosition, playerPosition, ref portalClosestPoints);
+
+                float lowestCost = float.MaxValue;
+                float routeLength = float.MaxValue;
+                distancesThroughArrivalPortals.Clear();
+
+                for (int i = 0; i < roomPair.routeAlternatives.Count; i++)
                 {
-                    FindSoundArrivalPoints(ref traversalRoutes, in portalClosestPoints);
-                    CalculateEmitterVirtualPositions(in traversalRoutes);
+                    var routeAlternative = roomPair.routeAlternatives[i];
+                    routeNodes.Clear();
+                    GetRouteNodes(instancePosition, playerPosition, in routeAlternative, in portalClosestPoints, ref routeNodes);
+                    GetRouteCostAndDistance(in routeNodes, out float cost, out float distance);
 
-                    #if UNITY_EDITOR
-                    VisualizeVirtualPositions(in traversalRoutes);
-                    #endif
-                }
-                // <- EXPERIMENTING WITH THE EMITTER VIRTUAL POSITION CALCULATIONS
+                    int lastIndex = routeAlternative.Count - 1;
 
-                // Calculate the propagation cost to the player for each route and pick the one with the lowest value.
-                // If multiple routes have the same total propagation cost, pick the one with the shortest traversal distance.
-                SpatialAudioRoute lowestPropagationCostRoute = null;
-                float lowestPropagationCost = float.MaxValue;
-
-                for (int j = 0; j < traversalRoutes.Count; j++)
-                {
-                    SpatialAudioRoute route = traversalRoutes[j];
-                    float totalPropagationCost = CalculatePathPropagationCost(route, portalClosestPoints);
-
-                    if (totalPropagationCost < lowestPropagationCost)
+                    if (lastIndex >= 0 && !distancesThroughArrivalPortals.ContainsKey(routeAlternative[lastIndex]))
                     {
-                        lowestPropagationCost = totalPropagationCost;
-                        lowestPropagationCostRoute = route;
+                        distancesThroughArrivalPortals.Add(routeAlternative[lastIndex], distance);
                     }
-                    else if (totalPropagationCost == lowestPropagationCost)
+
+                    if (i == 0 || cost < lowestCost || (cost == lowestCost && distance < routeLength))
                     {
-                        if (lowestPropagationCostRoute != null)
+                        lowestCost = cost;
+                        routeLength = distance;
+#if UNITY_EDITOR
+                        if (debugDrawModes.HasFlag(DebugDrawModes.PropationCost))
                         {
-                            if (route.routeLength < lowestPropagationCostRoute.routeLength)
-                            {
-                                lowestPropagationCost = totalPropagationCost;
-                                lowestPropagationCostRoute = route;
-                            }
+                            debugDrawRouteNodes.Clear();
+                            debugDrawRouteNodes.AddRange(routeNodes);
                         }
-                        else
-                        {
-                            lowestPropagationCost = totalPropagationCost;
-                            lowestPropagationCostRoute = route;
-                        }
+#endif
+                    }          
+                }
+
+#if UNITY_EDITOR
+
+                if (visualizeEmitterVirtualPositions)
+                {
+                    foreach (var route in roomPair.routeAlternatives)
+                    {
+                        if (route.Count == 0)
+                            continue;
+
+                        var arrivalPortal = route[route.Count - 1];
+
+                        if (arrivalPortal.portalType == SpatialAudioPortal.PortalType.Wall)
+                            continue;
+
+                        if (!portalClosestPoints.ContainsKey(arrivalPortal))
+                            continue;
+
+                        Vector3 arrivalPoint = portalClosestPoints[arrivalPortal];
+                        Vector3 direction = (arrivalPoint - playerPosition).normalized;
+                        float distance = distancesThroughArrivalPortals[arrivalPortal];
+                        Vector3 virtualPosition = playerPosition + direction * distance;
+                        Debug.DrawLine(playerPosition, virtualPosition, Color.cyan);
                     }
                 }
 
                 if (debugDrawModes.HasFlag(DebugDrawModes.PropationCost))
                 {
-                    DrawSoundPath(lowestPropagationCostRoute, portalClosestPoints);
+                    DrawSoundPath(debugDrawRouteNodes);
                 }
+#endif
+
+                SetParameterValue(instance.propagationID, lowestCost, instance.eventInstance);
+                ScaleRolloffDistance(directRouteLength, routeLength, instance);
+            }
+        }
+
+        private bool TryGetMatchingRoomPair(SpatialAudioRoom roomA, SpatialAudioRoom roomB, out RoomPair roomPair)
+        {
+            roomPair = null;
+
+            foreach (var pair in roomPairs)
+            {
+                if (pair == null)
+                    continue;
                 
-                if (activeModes.HasFlag(ActiveModes.Obstruction))
+                if (pair.IsMatch(roomA, roomB))
                 {
-                    if (obstructionCheckThreshold >= lowestPropagationCost)
+                    roomPair = pair;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void GetClosestPointsOnPortals(Vector3 instancePosition, Vector3 playerPosition, ref Dictionary<SpatialAudioPortal, Vector3> closestPoints)
+        {
+            Vector3 direction = (playerPosition - instancePosition).normalized;
+            var ray = new Ray(instancePosition, direction);
+
+            foreach (var portal in spatialAudioPortals)
+            {
+                var collider = portal.portalCollider;
+
+                if (collider != null && portal != null && !closestPoints.ContainsKey(portal))
+                {
+                    if (collider.bounds.IntersectRay(ray, out float distance))
                     {
-                        CheckObstruction(instance);
+                        Vector3 hitPoint = instancePosition + (direction * distance);
+                        closestPoints.Add(portal, hitPoint);
                     }
                     else
                     {
-                        ResetObstruction(null, instance);
+                        Vector3 closestFromInstance = portal.portalCollider.ClosestPoint(instancePosition);
+                        Vector3 closestFromPlayer = portal.portalCollider.ClosestPoint(playerPosition);
+
+                        float distanceThroughInstanceCp = GetIndirectDistance(instancePosition, closestFromInstance, playerPosition);
+                        float distanceThroughPlayerCp = GetIndirectDistance(instancePosition, closestFromPlayer, playerPosition);
+
+                        if (distanceThroughInstanceCp <= distanceThroughPlayerCp)
+                        {
+                            portalClosestPoints.Add(portal, closestFromInstance);
+                        }
+                        else
+                        {
+                            portalClosestPoints.Add(portal, closestFromPlayer);
+                        }
                     }
                 }
-
-                // Assign the calculated propagation cost to the EventInstance.
-                SetParameterValue(instance.propagationID, lowestPropagationCost, instance.eventInstance);
-
-                if (experimentalMode) 
-                    continue;
-
-                // Modify the fall-off distance of the instance to take into account the (potentially) longer route traversed. 
-                instanceToPlayerDistances.TryGetValue(instance, out float directDistance);
-                ScaleFalloffDistance(directDistance, lowestPropagationCostRoute.routeLength, instance);
             }
+        }
+
+        private void GetRouteNodes(Vector3 instancePosition, Vector3 playerPosition, in List<SpatialAudioPortal> routePortals, in Dictionary<SpatialAudioPortal, Vector3> closestPoints, ref List<Node> routeNodes)
+        {
+            routeNodes.Add(new Node(Node.NodeType.Emitter, instancePosition));
+
+            for (int i = 0; i < routePortals.Count; i++)
+            {
+                var portal = routePortals[i];
+
+                if (portal != null && closestPoints.ContainsKey(portal))
+                {
+                    var nodeType = portal.portalType == SpatialAudioPortal.PortalType.Opening ? Node.NodeType.Opening : Node.NodeType.Wall;
+                    Vector3 position = closestPoints[portal];
+                    float portalClosednessCost = nodeType == Node.NodeType.Opening ? portal.PortalStatus : 0f;
+                    float traversalMaxCost = nodeType == Node.NodeType.Opening ? portal.traversalMaxCost : 0f;
+                    float wallOcclusion = nodeType == Node.NodeType.Wall ? portal.wallOcclusion : 0f;
+                    routeNodes.Add(new Node(nodeType, position, portalClosednessCost, traversalMaxCost, wallOcclusion));
+                }
+            }
+
+            routeNodes.Add(new Node(Node.NodeType.Listener, playerPosition));
         }
 
         private void ResetPropagationCost(List<RoomAwareInstance> instances)
@@ -940,274 +1015,7 @@ namespace FMODUnityTools
 
                 SetParameterValue(instance.propagationID, Parameters.PropagationCostMinValue, instance.eventInstance);
 
-                if (experimentalMode)
-                    continue;
-
                 instance.eventInstance.setProperty(EVENT_PROPERTY.MAXIMUM_DISTANCE, instance.maxDistance);
-            }
-        }
-
-        private void UpdatePortalHitData(Vector3 instancePosition, Vector3 playerPosition, ref Dictionary<SpatialAudioPortal, Vector3> hitData)
-        {
-            Vector3 direction = (playerPosition - instancePosition).normalized;
-            var ray = new Ray(instancePosition, direction);
-
-            foreach (var item in colliderToPortalData)
-            {
-                if (item.Key != null && item.Value != null && !hitData.ContainsKey(item.Value))
-                {
-                    var collider = item.Key;
-                    var portal = item.Value;
-
-                    if (collider.bounds.IntersectRay(ray, out float distance))
-                    {
-                        Vector3 hitPoint = instancePosition + (direction * distance);
-                        hitData.Add(portal, hitPoint);
-                    }
-                }
-            }
-        }
-
-        //Reusable data structures for the "FindTraversalRoutes" -method to reduce the GC overhead.
-        private List<SpatialAudioPortal> startingRoomPortals = new List<SpatialAudioPortal>();
-        private List<SpatialAudioPortal> portalsToNewUnvisitedRooms = new List<SpatialAudioPortal>();
-        private Dictionary<SpatialAudioPortal, float> newPortalsByDistance = new Dictionary<SpatialAudioPortal, float>();
-
-        private void FindTraversalRoutes(SpatialAudioRoom startingRoom, in Dictionary<SpatialAudioPortal, Vector3> portalHitData, float routeMaxLength, 
-                                         ref Dictionary<SpatialAudioPortal, Vector3> portalClosestPoints, RoomAwareInstance instance,
-                                         ref List<SpatialAudioRoute> traversalRoutes)
-        {
-            var instanceNode = new SpatialAudioNode();
-            
-            instanceNode.isInstance = true;
-            instanceNode.roomAwareInstance = instance;
-
-            // Get all the portals in the instance's room.
-            startingRoomPortals.Clear();
-            GetStartingRoomPortals(startingRoom, ref startingRoomPortals);
-
-            if (startingRoomPortals.Count < 1)
-                return;
-
-            // For each portal, find the point traversing through which gives the shortest distance from the emitter to the player.
-            // First, check the raycast data obtained earlier: if the portal was hit, store the hit point on the portal.
-            // If the portal was not hit, calculate the closest point on the portal from both the player's and the emitter's position.
-            // Of the two points, select and store the one which results in the lowest overall distance when we pass through it on route from the sound to the player.
-            for (int i = 0; i < startingRoomPortals.Count; i++)
-            {
-                SpatialAudioPortal portal = startingRoomPortals[i];
-
-                if (portalHitData.ContainsKey(portal))
-                {
-                    portalClosestPoints.Add(portal, portalHitData[portal]);
-                }
-                else
-                {
-                    CalculatePortalClosestPoint(portal, instance.currentPosition, ref portalClosestPoints);
-                }
-
-                // Check that the closest point on portal is within the maximum rolloff distance of the emitter.
-                // If true, start a new route from that portal towards the player.
-                // Store the route distance.
-                float instanceToPortalDistance = Vector3.Distance(instance.currentPosition, portalClosestPoints[portal]);
-
-                if (instanceToPortalDistance <= routeMaxLength) 
-                {
-                    var newRoute = new SpatialAudioRoute();
-                    newRoute.routePoints.Add(instanceNode);
-                    newRoute.cacheLastNode = instanceNode;
-                    SpatialAudioNode newNode = portalToNodeData[portal];
-                    newRoute.routePoints.Add(newNode);
-                    newRoute.routeLength = instanceToPortalDistance;
-                    newRoute.visitedRooms.Add(startingRoom);
-                    traversalRoutes.Add(newRoute);                 
-                }
-            }
-
-            // Keep extending the routes until:
-            // 1. They reach the player OR
-            // 2. Their length exceeds the maximum rolloff distance of the emitter OR
-            // 3. They cannot find any new rooms to visit OR
-            // 4. The number of rooms visited exceeds the set max number (checkLevelLimit);
-            for (int i = 0; i < traversalRoutes.Count; i++) 
-            {
-                SpatialAudioRoute route = traversalRoutes[i];
-
-                while (route.routeLength < routeMaxLength && !CheckIfLastNodeIsPlayer(route) && 
-                       route.visitedRooms.Count <= CheckLevelLimit && NewNodeHasBeenAdded(route))
-                {
-                    SpatialAudioNode lastNode = route.routePoints[route.routePoints.Count - 1];
-
-                    // There should always be just two, process the one that has not been yet visited
-                    List<SpatialAudioRoom> connectedRooms = lastNode.nodePortal.GetConnectedRooms();
-
-                    bool unvisitedRoomFound = false;
-                    SpatialAudioRoom unvisitedRoom = null;
-
-                    for (int j = 0; j < connectedRooms.Count; j++)
-                    {
-                        if (!route.visitedRooms.Contains(connectedRooms[j]))
-                        {
-                            unvisitedRoomFound = true;
-                            unvisitedRoom = connectedRooms[j];
-                        }                    
-                    }
-
-                    if (unvisitedRoomFound)
-                    {
-                        SpatialAudioRoom currentUnvisitedRoom = unvisitedRoom;
-
-                        if (currentUnvisitedRoom == currentPlayerRoom)
-                        {
-                            Vector3 portalPosition = portalClosestPoints[lastNode.nodePortal];
-                            float distanceToPlayer = Vector3.Distance(portalPosition, playerPosition);
-                            float totalDistance = route.routeLength + distanceToPlayer;
-
-                            if (totalDistance <= routeMaxLength)
-                            {
-                                route.routePoints.Add(playerNode);
-                                route.cacheLastNode = lastNode;
-                                route.routeLength = totalDistance;
-                                break;
-                            }
-                            else
-                            {
-                                route.cacheLastNode = lastNode;
-                                break;
-                            }
-                        }
-                        // From the current unvisited room, find the portals that lead to yet another unvisited rooms. 
-                        portalsToNewUnvisitedRooms.Clear();
-                        GetPortalsToUnvisitedRooms(currentUnvisitedRoom, in route.visitedRooms, ref portalsToNewUnvisitedRooms);
-                        route.visitedRooms.Add(currentUnvisitedRoom);
-
-                        // Temporarily store the new valid portals paired with their total route length. 
-                        newPortalsByDistance.Clear();
-
-                        for (int k = 0; k < portalsToNewUnvisitedRooms.Count; k++)
-                        {
-                            SpatialAudioPortal newPortal = portalsToNewUnvisitedRooms[k];
-
-                            // Similarly to what was done earlier, find the closest traversal points on new portals.
-                            // <- Only do the check if the traversal point for that portal has not yet been determined.
-                            if (!portalClosestPoints.ContainsKey(newPortal))
-                            {
-                                if (portalHitData.ContainsKey(newPortal))
-                                {
-                                    portalClosestPoints.Add(newPortal, portalHitData[newPortal]);
-                                }
-                                else
-                                {
-                                    CalculatePortalClosestPoint(newPortal, instance.currentPosition, ref portalClosestPoints);
-                                }
-                            }
-
-                            // Calculate the distance from the previous route node portal to the new portal
-                            SpatialAudioNode previousNode = route.routePoints[route.routePoints.Count - 1];
-                            Vector3 previousNodePortalClosestPoint = portalClosestPoints[previousNode.nodePortal];
-                            Vector3 newPortalClosestPoint = portalClosestPoints[newPortal];              
-                            float distance = Vector3.Distance(previousNodePortalClosestPoint, newPortalClosestPoint);
-                            float totalRouteLength = route.routeLength + distance;
-
-                            // Add the new portal to the route extension list if traversing to it does not result 
-                            // in exceeding the maximum rolloff distance of the emitter.
-                            if (totalRouteLength <= routeMaxLength)
-                            {
-                                newPortalsByDistance.Add(newPortal, totalRouteLength);
-                            }
-                        }
-                            
-                        // If the number of new valid portals for route extension is more than one, 
-                        // create deep copies of the original route and add those to the 'travelsalRoutes' -list.
-                        //  <- One of the portals always extends the current existing route.
-                        // If no new valid portals were found, the last node and the cached last node of the route 
-                        // are set as the same in order to terminate the 'while' -loop.
-                        if (newPortalsByDistance.Count == 0)
-                        {
-                            route.cacheLastNode = route.routePoints[route.routePoints.Count - 1];
-                        }
-                        else if (newPortalsByDistance.Count == 1)
-                        {
-                            foreach (var portal in newPortalsByDistance)
-                            {
-                                SpatialAudioNode newNode = portalToNodeData[portal.Key];
-                                route.cacheLastNode = route.routePoints[route.routePoints.Count - 1];
-                                route.routePoints.Add(newNode);
-                                route.routeLength = portal.Value;
-                            }
-                        }
-                        else if (newPortalsByDistance.Count > 1)
-                        {                                
-                            int deepCopyNumber = newPortalsByDistance.Count - 1;
-
-                            foreach (var item in newPortalsByDistance)
-                            {
-                                if (deepCopyNumber > 0)
-                                {
-                                    var routeCopy = new SpatialAudioRoute();
-                                    var routePointsCopy = new List<SpatialAudioNode>(route.routePoints);
-                                    var visitedRoomsCopy = new HashSet<SpatialAudioRoom>(route.visitedRooms);
-                                    routeCopy.routePoints = routePointsCopy;
-                                    routeCopy.visitedRooms = visitedRoomsCopy;
-                                    routeCopy.cacheLastNode = routeCopy.routePoints[routeCopy.routePoints.Count - 1];
-
-                                    SpatialAudioNode newNode = portalToNodeData[item.Key];
-                                    routeCopy.routePoints.Add(newNode);
-                                    routeCopy.routeLength = item.Value;
-                                    traversalRoutes.Add(routeCopy);
-                                    deepCopyNumber--;                                          
-                                }
-                                else
-                                {
-                                    SpatialAudioNode newNode = portalToNodeData[item.Key];
-                                    route.cacheLastNode = route.routePoints[route.routePoints.Count - 1];
-                                    route.routePoints.Add(newNode);
-                                    route.routeLength = item.Value;
-                                }
-                            }
-                        }                      
-                    }
-                    else
-                    {
-                        route.cacheLastNode = route.routePoints[route.routePoints.Count - 1];
-                    }
-                }
-            }
-        }
-
-        public void GetStartingRoomPortals(SpatialAudioRoom startingRoom, ref List<SpatialAudioPortal> startingRoomPortals)
-        {
-            for (int i = 0; i < startingRoom.roomConnections.Count; i++)
-            {
-                var roomConnection = startingRoom.roomConnections[i];
-
-                for (int j = 0; j < roomConnection.connectingPortals.Length; j++)
-                {
-                    SpatialAudioPortal portal = roomConnection.connectingPortals[j];
-
-                    if (!startingRoomPortals.Contains(portal))
-                    {
-                        startingRoomPortals.Add(portal);
-                    }
-                }                
-            }
-        }
-
-        private void CalculatePortalClosestPoint(SpatialAudioPortal portal, Vector3 instancePosition, ref Dictionary<SpatialAudioPortal, Vector3> portalClosestPoints)
-        {
-            Vector3 closestFromInstance = portal.portalCollider.ClosestPoint(instancePosition);
-            Vector3 closestFromPlayer = portal.portalCollider.ClosestPoint(playerPosition);
-
-            float distanceThroughInstanceCp = GetIndirectDistance(instancePosition, closestFromInstance, playerPosition);
-            float distanceThroughPlayerCp = GetIndirectDistance(instancePosition, closestFromPlayer, playerPosition);
-
-            if (distanceThroughInstanceCp <= distanceThroughPlayerCp)
-            {
-                portalClosestPoints.Add(portal, closestFromInstance);             
-            }
-            else
-            {
-                portalClosestPoints.Add(portal, closestFromPlayer);
             }
         }
 
@@ -1215,149 +1023,14 @@ namespace FMODUnityTools
         {
             float instanceToPortal = Vector3.Distance(instancePosition, portalPosition);
             float portalToPlayer = Vector3.Distance(portalPosition, playerPosition);
-            return instanceToPortal + portalToPlayer; 
+            return instanceToPortal + portalToPlayer;
         }
 
-        private bool CheckIfLastNodeIsPlayer (SpatialAudioRoute route)
+        private void ScaleRolloffDistance(float directRouteLength, float routeLength, RoomAwareInstance instance)
         {
-            if (route != null && route.routePoints != null && route.routePoints.Count > 0)
-            {
-                var lastNode = route.routePoints[route.routePoints.Count - 1];
-
-                if (lastNode.isPlayer)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private bool NewNodeHasBeenAdded(SpatialAudioRoute route)
-        {
-            if (route != null && route.routePoints != null && route.routePoints.Count > 0)
-            {
-                var currentLastNode = route.routePoints[route.routePoints.Count - 1];
-                
-                if (currentLastNode != route.cacheLastNode)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private void GetPortalsToUnvisitedRooms(SpatialAudioRoom room, in HashSet<SpatialAudioRoom> visitedRooms, ref List<SpatialAudioPortal> newPortals)
-        {
-            for (int i = 0; i < room.roomConnections.Count; i++)
-            {
-                var roomConnection = room.roomConnections[i];
-
-                if (!visitedRooms.Contains(roomConnection.connectedRoom))
-                {
-                    for (int j = 0; j < roomConnection.connectingPortals.Length; j++)
-                    {
-                        var newPortal = roomConnection.connectingPortals[j];
-
-                        if (newPortal != null && !newPortals.Contains(newPortal))
-                        {
-                            newPortals.Add(newPortal);
-                        }                      
-                    }
-                }
-            }
-        }
-
-        private float CalculatePathPropagationCost(SpatialAudioRoute route, Dictionary<SpatialAudioPortal, Vector3> portalPositions)
-        {
-            float totalPropagationCost = 0;
-
-            for (int i = 0; i < route.routePoints.Count - 2; i++)
-            {
-                SpatialAudioNode nodeA = route.routePoints[i];
-                SpatialAudioNode nodeB = route.routePoints[i + 1];
-                SpatialAudioNode nodeC = route.routePoints[i + 2];
-
-                Vector3 posA;
-                Vector3 posB;
-                Vector3 posC;
-
-                // Node A can be either an emitter or a portal - never the player.  
-                if (nodeA.isInstance) 
-                {
-                    posA = nodeA.roomAwareInstance.currentPosition;
-                }
-                else { portalPositions.TryGetValue(nodeA.nodePortal, out posA); }
-
-                // Node B is always a portal
-                portalPositions.TryGetValue(nodeB.nodePortal, out posB);
-
-                // Node C can be either a portal or the player
-                if (nodeC.isInstance)
-                {
-                    posC = nodeC.roomAwareInstance.currentPosition;
-                }
-                else 
-                {
-                    posC = playerPosition;   
-                }
-
-                // Different procedures for 'opening' and 'wall' -types of portals. 
-                // <- Diffraction obviously not relevant with walls.
-                if (nodeB.nodePortal != null && nodeB.nodePortal.portalType == SpatialAudioPortal.PortalType.Opening)
-                {
-                    Vector3 dirAB = posB - posA;
-                    Vector3 dirBC = posC - posB;
-
-                    float angle;
-
-                    if (dirAB.magnitude < minimumVectorMagnitude || dirBC.magnitude < minimumVectorMagnitude)
-                    {
-                        angle = 0;
-                    }
-                    else
-                    {
-                        angle = Vector3.Angle(dirAB, dirBC);
-                    }
-
-                    float portalDiffraction = angle / 180;
-                    float portalClosednessCost = nodeB.nodePortal.PortalStatus;
-                    float magnitudeScaling;
-
-                    if (dirAB.magnitude < dirBC.magnitude)
-                    {
-                        magnitudeScaling = dirAB.magnitude / maxCostDistance;
-                        magnitudeScaling = Mathf.Clamp01(magnitudeScaling);
-                    }
-                    else
-                    {
-                        magnitudeScaling = dirBC.magnitude / maxCostDistance;
-                        magnitudeScaling = Mathf.Clamp01(magnitudeScaling);
-                    }
-
-                    totalPropagationCost += (magnitudeScaling * (portalDiffraction + nodeB.nodePortal.traversalMaxCost) + portalClosednessCost); 
-                }
-                else
-                {
-                    totalPropagationCost += nodeB.nodePortal.wallOcclusion;
-                }
-
-                if (totalPropagationCost >= 1)
-                {
-                    totalPropagationCost = 1;
-                    return totalPropagationCost;
-                }
-            }
-
-            return totalPropagationCost;     
-        }
-
-        private void ScaleFalloffDistance(float directRouteLength, float indirectRouteLength, RoomAwareInstance instance)
-        {
-            float difference = indirectRouteLength - directRouteLength;
+            float difference = routeLength - directRouteLength;
             float scaledRolloff = instance.maxDistance - difference;
-          
+
             if (instance.eventInstance.isValid())
             {
                 var result = instance.eventInstance.setProperty(EVENT_PROPERTY.MAXIMUM_DISTANCE, scaledRolloff);
@@ -1368,31 +1041,80 @@ namespace FMODUnityTools
                 }
             }
         }
-        
-        private void DrawSoundPath(SpatialAudioRoute route, Dictionary<SpatialAudioPortal, Vector3> portalPositions)
+
+        private void DrawSoundPath(List<Node> routeNodes)
         {
-            for (int i = 0; i < route.routePoints.Count - 1; i++)
+            for (int i = 0; i < routeNodes.Count - 1; i++)
             {
-                SpatialAudioNode n1 = route.routePoints[i];
-                SpatialAudioNode n2 = route.routePoints[i + 1];
-
-                Vector3 pos1;
-                Vector3 pos2;
-
-                if (n1.isInstance) { pos1 = n1.roomAwareInstance.currentPosition; }
-                else if (n1.isPlayer) { pos1 = playerPosition; }
-                else { portalPositions.TryGetValue(n1.nodePortal, out pos1); }
-
-                if (n2.isInstance) { pos2 = n2.roomAwareInstance.currentPosition; }
-                else if (n2.isPlayer) { pos2 = playerPosition; }
-                else { portalPositions.TryGetValue(n2.nodePortal, out pos2); }
-
-                Debug.DrawLine(pos1, pos2, Color.magenta, CheckInterval);
+                Node nodeA = routeNodes[i];
+                Node nodeB = routeNodes[i + 1];
+                Debug.DrawLine(nodeA.position, nodeB.position, Color.magenta);
             }
         }
+
+        private void GetRouteCostAndDistance(in List<Node> routeNodes, out float cost, out float distance)
+        {
+            cost = 0f;
+            distance = 0f;
+
+            for (int i = 0; i < routeNodes.Count - 2; i++)
+            {
+                Node nodeA = routeNodes[i];
+                Node nodeB = routeNodes[i + 1];
+                Node nodeC = routeNodes[i + 2];
+
+                Vector3 posA = nodeA.position;
+                Vector3 posB = nodeB.position;
+                Vector3 posC = nodeC.position;
+
+                Vector3 dirAB = posB - posA;
+                Vector3 dirBC = posC - posB;
+
+                float magnitudeAB = dirAB.magnitude;
+                float magnitudeBC = dirBC.magnitude;
+                float meanMagnitude = (magnitudeAB + magnitudeBC) / 2;
+
+                if (i == routeNodes.Count - 3)
+                {
+                    distance += magnitudeAB + magnitudeBC;
+                }
+                else
+                {
+                    distance += magnitudeAB;
+                }
+
+                float angle;
+
+                if (magnitudeAB < MinimumVectorMagnitude || magnitudeBC < MinimumVectorMagnitude)
+                {
+                    angle = 0;
+                }
+                else
+                {
+                    angle = Vector3.Angle(dirAB, dirBC);
+                }
+
+                float portalDiffraction = angle / 180;
+                float magnitudeScaling = Mathf.Clamp01(meanMagnitude / maxCostDistance);
+                float traversalCost = Mathf.Clamp01(nodeB.traversalMaxCost / maxCostDistance);
+                
+                if (nodeB.nodeType == Node.NodeType.Opening)
+                {
+                    cost += (magnitudeScaling * (portalDiffraction + traversalCost) + nodeB.portalClosednessCost);
+                }
+                else
+                {
+                    cost += nodeB.wallOcclusion;
+                }
+            }
+
+            cost = Mathf.Clamp01(cost);
+        }
+
         #endregion
 
         #region Cleanup
+
         void OnDestroy()
         {
             if (Instance == this)
@@ -1400,62 +1122,7 @@ namespace FMODUnityTools
                 Instance = null;
             }
         }
-        #endregion
 
-        #region Experimental
-
-        private void FindSoundArrivalPoints (ref List<SpatialAudioRoute> routesToPlayer, 
-                                             in Dictionary<SpatialAudioPortal, Vector3> portalClosestPoints)
-        {
-            for (int i = 0; i < routesToPlayer.Count; i++)
-            {
-                SpatialAudioRoute route = routesToPlayer[i];
-
-                if (route == null)
-                    continue;
-
-                SpatialAudioPortal arrivalPortal = route.cacheLastNode.nodePortal; 
-
-                if (arrivalPortal.portalType == SpatialAudioPortal.PortalType.Opening && arrivalPortal.PortalStatus < 1) // temp condition for testing
-                {
-                    bool pointFound = portalClosestPoints.TryGetValue(arrivalPortal, out Vector3 arrivalPoint);
-
-                    if (pointFound)
-                    {
-                        route.arrivedThroughOpening = true;
-                        route.arrivalPoint = arrivalPoint;                        
-                    }
-                }
-            }
-        }
-  
-        private void CalculateEmitterVirtualPositions(in List<SpatialAudioRoute> routesToPlayer)
-        {
-            for (int i = 0; i < routesToPlayer.Count; i++)
-            {
-                SpatialAudioRoute route = routesToPlayer[i];
-
-                if (route == null || !route.arrivedThroughOpening)
-                    continue;
-
-                Vector3 directionToVirtualPosition = (route.arrivalPoint - playerPosition).normalized;
-                route.virtualPosition = playerPosition + directionToVirtualPosition * route.routeLength;
-            }
-        }
-
-        private void VisualizeVirtualPositions(in List<SpatialAudioRoute> routesToPlayer)
-        {
-            for (int i = 0; i < routesToPlayer.Count; i++)
-            {
-                SpatialAudioRoute route = routesToPlayer[i];
-
-                if (route == null || !route.arrivedThroughOpening)
-                    continue;
-
-                Debug.DrawLine(playerPosition, route.virtualPosition, Color.white, CheckInterval);
-            }
-        }
-        
         #endregion
     }
 }

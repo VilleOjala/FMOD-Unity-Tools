@@ -149,7 +149,7 @@ namespace FMODUnityTools
 
         private static void DebugDraw(Vector3 origin, Vector3 end, Color color)
         {
-            Debug.DrawLine(origin, end, color, 0.03f);
+            Debug.DrawLine(origin, end, color);
         }
     }
 }
