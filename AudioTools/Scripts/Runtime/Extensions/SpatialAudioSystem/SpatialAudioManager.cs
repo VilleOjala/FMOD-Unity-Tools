@@ -59,7 +59,7 @@ namespace FMODUnityTools
         private HashSet<Collider> obstructingColliders = new HashSet<Collider>();
 
         // The maximum number of rooms that will be visited when searching for routes between two rooms.
-        private const int MaxVisitedRooms = 8;
+        private const int MaxVisitedRooms = 6;
 
         private List<RoomAwareInstance> instancesWithKnownRoom = new List<RoomAwareInstance>();
         private List<RoomAwareInstance> instancesWithUnknownRoom = new List<RoomAwareInstance>();
@@ -832,6 +832,10 @@ namespace FMODUnityTools
                                 routeAlternatives.Add(route.routePortals);
                             }
                         }
+
+                        // Don't create a room pair if no valid routes were found
+                        if (routeAlternatives.Count == 0)
+                            continue;
 
                         var roomPair = new RoomPair(roomA, roomB, routeAlternatives);
                         roomPairs.Add(roomPair);
