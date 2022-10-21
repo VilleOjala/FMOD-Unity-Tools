@@ -33,6 +33,11 @@ namespace FMODUnityTools
         [Range(0.1f, 30.0f)]
         public float maxCostDistance = 0.1f;
 
+        // The maximum number of rooms that will be visited when searching for routes between two rooms.
+        [SerializeField, Range(1, 8)]
+        private int maxPropagationDepth = 8;
+        public int MaxPropagationDepth { get { return maxPropagationDepth; } }
+
         public SpatialAudioRoom[] spatialAudioRooms = new SpatialAudioRoom[0];
         public SpatialAudioPortal[] spatialAudioPortals = new SpatialAudioPortal[0];
         private List<SpatialAudioRoom> validSpatialAudioRooms = new List<SpatialAudioRoom>();
@@ -41,7 +46,6 @@ namespace FMODUnityTools
         private SpatialAudioRoom currentPlayerRoom;
         private List<RoomAwareInstance> registeredInstances = new List<RoomAwareInstance>();
         private Vector3 playerPosition;
-
         /*
         When the level starts, each Spatial Audio Room will be set as a starting room and all the directly or indirectly reachable rooms from it are then searched for.
         <-This should encompass all the other rooms in the level, if the spatial audio geometry has been set up correctly.
@@ -57,9 +61,6 @@ namespace FMODUnityTools
 
         // If the 'Require Obstruction Tag' -mode is active, the SpatialAudioObstructionTag instances populate this list with their associated colliders. 
         private HashSet<Collider> obstructingColliders = new HashSet<Collider>();
-
-        // The maximum number of rooms that will be visited when searching for routes between two rooms.
-        private const int MaxVisitedRooms = 6;
 
         private List<RoomAwareInstance> instancesWithKnownRoom = new List<RoomAwareInstance>();
         private List<RoomAwareInstance> instancesWithUnknownRoom = new List<RoomAwareInstance>();
@@ -788,7 +789,7 @@ namespace FMODUnityTools
                         {
                             var route = routes[k];
 
-                            while (route.newestFoundRoom != roomB && route.visitedRooms.Last() != route.newestFoundRoom && route.visitedRooms.Count <= MaxVisitedRooms)
+                            while (route.newestFoundRoom != roomB && route.visitedRooms.Last() != route.newestFoundRoom && route.visitedRooms.Count <= MaxPropagationDepth)
                             {
                                 bool existingRouteExtended = false;
                                 var roomToVisit = route.newestFoundRoom;
