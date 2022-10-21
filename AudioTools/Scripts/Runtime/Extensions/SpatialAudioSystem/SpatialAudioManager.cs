@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using FMOD.Studio;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace FMODUnityTools
 {
@@ -33,19 +34,24 @@ namespace FMODUnityTools
         [Range(0.1f, 30.0f)]
         public float maxCostDistance = 0.1f;
 
-        // The maximum number of rooms that will be visited when searching for routes between two rooms.
-        [SerializeField, Range(1, 8)]
+        [SerializeField, Range(1, 8), Tooltip("The maximum number of rooms that will be visited when searching for routes between two rooms.")]
         private int maxPropagationDepth = 8;
         public int MaxPropagationDepth { get { return maxPropagationDepth; } }
 
         public SpatialAudioRoom[] spatialAudioRooms = new SpatialAudioRoom[0];
         public SpatialAudioPortal[] spatialAudioPortals = new SpatialAudioPortal[0];
         private List<SpatialAudioRoom> validSpatialAudioRooms = new List<SpatialAudioRoom>();
-        private List<RoomPair> roomPairs = new List<RoomPair>();
-        private List<SpatialAudioRoom> currentPlayerRooms = new List<SpatialAudioRoom>();
-        private SpatialAudioRoom currentPlayerRoom;
+
+        private Dictionary<SpatialAudioRoom, uint> roomUniqueIDs = new Dictionary<SpatialAudioRoom, uint>();
+        private uint ID_Incrementer = 1;
+        private Dictionary<SpatialAudioRoom, List<string>> relevantRoomPairsByRoom = new Dictionary<SpatialAudioRoom, List<string>>();
+        private Dictionary<string, RoomPair> roomPairs = new Dictionary<string, RoomPair>();
+
+        private List<SpatialAudioRoom> currentListenerRooms = new List<SpatialAudioRoom>();
+        private SpatialAudioRoom currentListenerRoom;
         private List<RoomAwareInstance> registeredInstances = new List<RoomAwareInstance>();
-        private Vector3 playerPosition;
+        private Vector3 listenerPosition;
+
         /*
         When the level starts, each Spatial Audio Room will be set as a starting room and all the directly or indirectly reachable rooms from it are then searched for.
         <-This should encompass all the other rooms in the level, if the spatial audio geometry has been set up correctly.
@@ -65,19 +71,18 @@ namespace FMODUnityTools
         private List<RoomAwareInstance> instancesWithKnownRoom = new List<RoomAwareInstance>();
         private List<RoomAwareInstance> instancesWithUnknownRoom = new List<RoomAwareInstance>();
         private List<RoomAwareInstance> audibleInstances = new List<RoomAwareInstance>();
-        private List<RoomAwareInstance> instancesInPlayerRoom = new List<RoomAwareInstance>();
+        private List<RoomAwareInstance> instancesInListenerRoom = new List<RoomAwareInstance>();
         private List<RoomAwareInstance> instancesInOtherRooms = new List<RoomAwareInstance>();
-        private Dictionary<RoomAwareInstance, float> instanceToPlayerDistances = new Dictionary<RoomAwareInstance, float>();
+        private Dictionary<RoomAwareInstance, float> instanceToListenerDistances = new Dictionary<RoomAwareInstance, float>();
         private List<Node> routeNodes = new List<Node>();
         private List<Node> debugDrawRouteNodes = new List<Node>();
         Dictionary<SpatialAudioPortal, float> distancesThroughArrivalPortals = new Dictionary<SpatialAudioPortal, float>();
         private Dictionary<SpatialAudioPortal, Vector3> portalClosestPoints = new Dictionary<SpatialAudioPortal, Vector3>();
 
         // When calculating the diffraction angle for a given portal, the angle will be set to zero if the magnitude of either direction vector is below this value.
-        // This is done to prevent the bugs/edge cases in angle calculations when the player or an emitter is crossing a room boundary. 
+        // This is done to prevent the bugs/edge cases in angle calculations when the listener or an emitter is crossing a room boundary. 
         // <- Using very short direction vectors may cause sudden unwanted jumps/artefact in the calculated diffraction values.
         private const float MinimumVectorMagnitude = 0.05f;
-
         private bool managerInitialized = false;
 
         [SerializeField]
@@ -137,9 +142,6 @@ namespace FMODUnityTools
 
             public bool IsMatch(SpatialAudioRoom roomA, SpatialAudioRoom roomB)
             {
-                if (this.roomA == null || this.roomB == null || roomA == null || roomB == null)
-                    return false;
-
                 if (this.roomA == roomA && this.roomB == roomB)
                     return true;
                 else
@@ -218,6 +220,12 @@ namespace FMODUnityTools
                     if (room.InitializeRoom(this))
                     {
                         validSpatialAudioRooms.Add(room);
+
+                        if (!roomUniqueIDs.ContainsKey(room))
+                        {
+                            roomUniqueIDs.Add(room, ID_Incrementer);
+                            ID_Incrementer++; 
+                        }
                     }
                 }
 
@@ -311,25 +319,25 @@ namespace FMODUnityTools
             registeredInstances.Add(roomAwareInstance);
         }
 
-        public void AddCurrentPlayerRoom(SpatialAudioRoom room)
+        public void AddCurrentListenerRoom(SpatialAudioRoom room)
         {
-            if (currentPlayerRooms.Contains(room))
+            if (currentListenerRooms.Contains(room))
             {
-                int oldIndex = currentPlayerRooms.IndexOf(room);
-                currentPlayerRooms.RemoveAt(oldIndex);
-                currentPlayerRooms.Insert(0, room);
+                int oldIndex = currentListenerRooms.IndexOf(room);
+                currentListenerRooms.RemoveAt(oldIndex);
+                currentListenerRooms.Insert(0, room);
             }
             else
             {
-                currentPlayerRooms.Insert(0, room);
+                currentListenerRooms.Insert(0, room);
             }
         }
 
-        public void RemoveCurrentPlayerRoom(SpatialAudioRoom room)
+        public void RemoveCurrentListenerRoom(SpatialAudioRoom room)
         {
-            if (currentPlayerRooms.Contains(room))
+            if (currentListenerRooms.Contains(room))
             {
-                currentPlayerRooms.Remove(room);
+                currentListenerRooms.Remove(room);
             }
         }
 
@@ -368,26 +376,26 @@ namespace FMODUnityTools
             if (!managerInitialized)
                 return;
 
-            bool foundPlayerPosition = HelperMethods.TryGetListenerPosition(out playerPosition);
+            bool foundListenerPosition = HelperMethods.TryGetListenerPosition(out listenerPosition);
 
-            if (!foundPlayerPosition)
+            if (!foundListenerPosition)
                 return;
 
             // Check that a registered instance is still playing and get its positional data.
             CheckRegisteredInstanceValidity();
             UpdateInstancePositionalData();
 
-            // Find registered instances that are within hearing distance from the player.
+            // Find registered instances that are within hearing distance from the listener.
             // <- In other words, we don't want to do spatial audio calculations for sounds that are inaudible anyway.
-            // If the propagation cost mode is active then also store the calculated player-to-emitter distances, 
+            // If the propagation cost mode is active then also store the calculated listener-to-emitter distances, 
             // since they will be again needed later on during the check protocol.
             audibleInstances.Clear();
-            instanceToPlayerDistances.Clear();
-            CheckInstanceAudibility(ref audibleInstances, ref instanceToPlayerDistances);
+            instanceToListenerDistances.Clear();
+            CheckInstanceAudibility(ref audibleInstances, ref instanceToListenerDistances);
 
-            if (activeModes.HasFlag(ActiveModes.PropagationCost) && currentPlayerRooms != null && currentPlayerRooms.Count > 0)
+            if (activeModes.HasFlag(ActiveModes.PropagationCost) && currentListenerRooms != null && currentListenerRooms.Count > 0)
             {
-                currentPlayerRoom = GetHighestPriorityRoom();
+                currentListenerRoom = GetHighestPriorityRoom();
 
                 // Find the current room for the registree.
                 // Put aside the registered instances for which the room look-up failed.
@@ -404,13 +412,13 @@ namespace FMODUnityTools
                     ResetObstruction(instancesWithUnknownRoom);
                 }
 
-                // Split the obtained relevant registered instances to those which are in the current player room and to those located in other rooms.
-                instancesInPlayerRoom.Clear();
+                // Split the obtained relevant registered instances to those which are in the current listener room and to those located in other rooms.
+                instancesInListenerRoom.Clear();
                 instancesInOtherRooms.Clear();
-                DivideInstancesByPlayerRelativePosition(ref instancesWithKnownRoom, ref instancesInPlayerRoom, ref instancesInOtherRooms, currentPlayerRoom);
+                DivideInstancesByListenerRelativePosition(ref instancesWithKnownRoom, ref instancesInListenerRoom, ref instancesInOtherRooms, currentListenerRoom);
 
-                // Remove propagation cost from registered instances that are in the same room with the player, which may have been applied during the previous check cycle.
-                ResetPropagationCost(instancesInPlayerRoom);
+                // Remove propagation cost from registered instances that are in the same room with the listener, which may have been applied during the previous check cycle.
+                ResetPropagationCost(instancesInListenerRoom);
 
                 // Calculate propagation cost for instances in other rooms.                  
                 CalculatePropagationCosts(instancesInOtherRooms);
@@ -498,9 +506,9 @@ namespace FMODUnityTools
             SpatialAudioRoom prioritizedRoom = null;
             bool firstEntryProcessed = false;
 
-            for (int i = 0; i < currentPlayerRooms.Count; i++)
+            for (int i = 0; i < currentListenerRooms.Count; i++)
             {
-                var room = currentPlayerRooms[i];
+                var room = currentListenerRooms[i];
 
                 if (room == null)
                     continue;
@@ -654,35 +662,35 @@ namespace FMODUnityTools
             return (posA - posB).sqrMagnitude < Mathf.Epsilon * Mathf.Epsilon;
         }
 
-        private void CheckInstanceAudibility(ref List<RoomAwareInstance> listForAudibleInstances, ref Dictionary<RoomAwareInstance, float> playerToEmitterDistances)
+        private void CheckInstanceAudibility(ref List<RoomAwareInstance> listForAudibleInstances, ref Dictionary<RoomAwareInstance, float> listenerToEmitterDistances)
         {
             foreach (var instance in registeredInstances)
             {
-                float playerToEmitterDistance = Vector3.Distance(playerPosition, instance.currentPosition);
+                float listenerToEmitterDistance = Vector3.Distance(listenerPosition, instance.currentPosition);
 
-                if (playerToEmitterDistance <= instance.maxDistance)
+                if (listenerToEmitterDistance <= instance.maxDistance)
                 {
                     listForAudibleInstances.Add(instance);
 
                     if (activeModes.HasFlag(ActiveModes.PropagationCost))
                     {
-                        playerToEmitterDistances.Add(instance, playerToEmitterDistance);
+                        listenerToEmitterDistances.Add(instance, listenerToEmitterDistance);
                     }
                 }
             }
         }
 
-        // Divides instances based on whether they are located in the same room with the player or inside some other room.
-        private void DivideInstancesByPlayerRelativePosition(ref List<RoomAwareInstance> allRelevantInstances, 
-                                                             ref List<RoomAwareInstance> instancesInPlayerRoom, 
-                                                             ref List<RoomAwareInstance> instancesInOtherRooms, 
-                                                             SpatialAudioRoom currentPlayerRoom)
+        // Divides instances based on whether they are located in the same room with the listener or inside some other room.
+        private void DivideInstancesByListenerRelativePosition(ref List<RoomAwareInstance> allRelevantInstances, 
+                                                               ref List<RoomAwareInstance> instancesInListenerRoom, 
+                                                               ref List<RoomAwareInstance> instancesInOtherRooms, 
+                                                               SpatialAudioRoom currentListenerRoom)
         {
             foreach (var instance in allRelevantInstances)
             {
-                if (instance.currentRoom == currentPlayerRoom)
+                if (instance.currentRoom == currentListenerRoom)
                 {
-                    instancesInPlayerRoom.Add(instance);
+                    instancesInListenerRoom.Add(instance);
                 }
                 else
                 {
@@ -729,7 +737,7 @@ namespace FMODUnityTools
                 debug = true;
             }
 #endif
-            float obstruction = SpatialAudioObstructionChecker.ObstructionCheck(playerPosition, emitterPostion,requireObstructionTag, 
+            float obstruction = SpatialAudioObstructionChecker.ObstructionCheck(listenerPosition, emitterPostion,requireObstructionTag, 
                                                                                 obstructionLayerMask, obstructionQueryTriggers,
                                                                                 obstructionRaycastSpread, debug, ignoreSelfCollider);
             SetParameterValue(obstructionID, obstruction, eventInstance);
@@ -838,8 +846,24 @@ namespace FMODUnityTools
                         if (routeAlternatives.Count == 0)
                             continue;
 
+                        uint roomA_ID = roomUniqueIDs[roomA];
+                        uint roomB_ID = roomUniqueIDs[roomB];
+                        string roomPairID = roomA_ID.ToString() + roomB_ID.ToString();
+
+                        if (relevantRoomPairsByRoom.ContainsKey(roomA))
+                        {
+                            var keyList = relevantRoomPairsByRoom[roomA];
+                            keyList.Add(roomPairID);
+                        }
+                        else
+                        {
+                            var keyList = new List<string>();
+                            keyList.Add(roomPairID);
+                            relevantRoomPairsByRoom.Add(roomA, keyList);
+                        }
+
                         var roomPair = new RoomPair(roomA, roomB, routeAlternatives);
-                        roomPairs.Add(roomPair);
+                        roomPairs.Add(roomPairID, roomPair);
                     }
                 }
             }
@@ -850,8 +874,8 @@ namespace FMODUnityTools
             foreach (var instance in instances)
             {
                 Vector3 instancePosition = instance.currentPosition;
-                float directRouteLength = instanceToPlayerDistances[instance];
-                bool foundPair = TryGetMatchingRoomPair(instance.currentRoom, currentPlayerRoom, out RoomPair roomPair);
+                float directRouteLength = instanceToListenerDistances[instance];
+                bool foundPair = TryGetMatchingRoomPair(instance.currentRoom, currentListenerRoom, out RoomPair roomPair);
 
                 if (!foundPair || roomPair.routeAlternatives.Count == 0)
                 {
@@ -860,7 +884,7 @@ namespace FMODUnityTools
                 }
 
                 portalClosestPoints.Clear();
-                GetClosestPointsOnPortals(instancePosition, playerPosition, ref portalClosestPoints);
+                GetClosestPointsOnPortals(instancePosition, listenerPosition, ref portalClosestPoints);
 
                 float lowestCost = float.MaxValue;
                 float routeLength = float.MaxValue;
@@ -870,7 +894,7 @@ namespace FMODUnityTools
                 {
                     var routeAlternative = roomPair.routeAlternatives[i];
                     routeNodes.Clear();
-                    GetRouteNodes(instancePosition, playerPosition, in routeAlternative, in portalClosestPoints, ref routeNodes);
+                    GetRouteNodes(instancePosition, listenerPosition, in routeAlternative, in portalClosestPoints, ref routeNodes);
                     GetRouteCostAndDistance(in routeNodes, out float cost, out float distance);
 
                     int lastIndex = routeAlternative.Count - 1;
@@ -912,10 +936,10 @@ namespace FMODUnityTools
                             continue;
 
                         Vector3 arrivalPoint = portalClosestPoints[arrivalPortal];
-                        Vector3 direction = (arrivalPoint - playerPosition).normalized;
+                        Vector3 direction = (arrivalPoint - listenerPosition).normalized;
                         float distance = distancesThroughArrivalPortals[arrivalPortal];
-                        Vector3 virtualPosition = playerPosition + direction * distance;
-                        Debug.DrawLine(playerPosition, virtualPosition, Color.cyan);
+                        Vector3 virtualPosition = listenerPosition + direction * distance;
+                        Debug.DrawLine(listenerPosition, virtualPosition, Color.cyan);
                     }
                 }
 
@@ -930,28 +954,31 @@ namespace FMODUnityTools
             }
         }
 
-        private bool TryGetMatchingRoomPair(SpatialAudioRoom roomA, SpatialAudioRoom roomB, out RoomPair roomPair)
+        private bool TryGetMatchingRoomPair(SpatialAudioRoom emitterRoom, SpatialAudioRoom listenerRoom, out RoomPair roomPair)
         {
             roomPair = null;
 
-            foreach (var pair in roomPairs)
+            if (!relevantRoomPairsByRoom.TryGetValue(emitterRoom, out List<string> keyList))
+                return false;
+           
+            foreach (var key in keyList)
             {
-                if (pair == null)
-                    continue;
-                
-                if (pair.IsMatch(roomA, roomB))
+                if (roomPairs.TryGetValue(key, out RoomPair pair))
                 {
-                    roomPair = pair;
-                    return true;
+                    if (pair.IsMatch(emitterRoom, listenerRoom))
+                    {
+                        roomPair = pair;
+                        return true;
+                    }
                 }
             }
 
             return false;
         }
 
-        private void GetClosestPointsOnPortals(Vector3 instancePosition, Vector3 playerPosition, ref Dictionary<SpatialAudioPortal, Vector3> closestPoints)
+        private void GetClosestPointsOnPortals(Vector3 instancePosition, Vector3 listenerPosition, ref Dictionary<SpatialAudioPortal, Vector3> closestPoints)
         {
-            Vector3 direction = (playerPosition - instancePosition).normalized;
+            Vector3 direction = (listenerPosition - instancePosition).normalized;
             var ray = new Ray(instancePosition, direction);
 
             foreach (var portal in spatialAudioPortals)
@@ -968,25 +995,25 @@ namespace FMODUnityTools
                     else
                     {
                         Vector3 closestFromInstance = portal.portalCollider.ClosestPoint(instancePosition);
-                        Vector3 closestFromPlayer = portal.portalCollider.ClosestPoint(playerPosition);
+                        Vector3 closestFromListener = portal.portalCollider.ClosestPoint(listenerPosition);
 
-                        float distanceThroughInstanceCp = GetIndirectDistance(instancePosition, closestFromInstance, playerPosition);
-                        float distanceThroughPlayerCp = GetIndirectDistance(instancePosition, closestFromPlayer, playerPosition);
+                        float distanceThroughInstanceCp = GetIndirectDistance(instancePosition, closestFromInstance, listenerPosition);
+                        float distanceThroughListenerCp = GetIndirectDistance(instancePosition, closestFromListener, listenerPosition);
 
-                        if (distanceThroughInstanceCp <= distanceThroughPlayerCp)
+                        if (distanceThroughInstanceCp <= distanceThroughListenerCp)
                         {
                             portalClosestPoints.Add(portal, closestFromInstance);
                         }
                         else
                         {
-                            portalClosestPoints.Add(portal, closestFromPlayer);
+                            portalClosestPoints.Add(portal, closestFromListener);
                         }
                     }
                 }
             }
         }
 
-        private void GetRouteNodes(Vector3 instancePosition, Vector3 playerPosition, in List<SpatialAudioPortal> routePortals, in Dictionary<SpatialAudioPortal, Vector3> closestPoints, ref List<Node> routeNodes)
+        private void GetRouteNodes(Vector3 instancePosition, Vector3 listenerPosition, in List<SpatialAudioPortal> routePortals, in Dictionary<SpatialAudioPortal, Vector3> closestPoints, ref List<Node> routeNodes)
         {
             routeNodes.Add(new Node(Node.NodeType.Emitter, instancePosition));
 
@@ -1005,7 +1032,7 @@ namespace FMODUnityTools
                 }
             }
 
-            routeNodes.Add(new Node(Node.NodeType.Listener, playerPosition));
+            routeNodes.Add(new Node(Node.NodeType.Listener, listenerPosition));
         }
 
         private void ResetPropagationCost(List<RoomAwareInstance> instances)
@@ -1024,11 +1051,11 @@ namespace FMODUnityTools
             }
         }
 
-        private float GetIndirectDistance(Vector3 instancePosition, Vector3 portalPosition, Vector3 playerPosition)
+        private float GetIndirectDistance(Vector3 instancePosition, Vector3 portalPosition, Vector3 listenerPosition)
         {
             float instanceToPortal = Vector3.Distance(instancePosition, portalPosition);
-            float portalToPlayer = Vector3.Distance(portalPosition, playerPosition);
-            return instanceToPortal + portalToPlayer;
+            float portalToListener = Vector3.Distance(portalPosition, listenerPosition);
+            return instanceToPortal + portalToListener;
         }
 
         private void ScaleRolloffDistance(float directRouteLength, float routeLength, RoomAwareInstance instance)
@@ -1100,8 +1127,9 @@ namespace FMODUnityTools
                 }
 
                 float portalDiffraction = angle / 180;
-                float magnitudeScaling = Mathf.Clamp01(meanMagnitude / maxCostDistance);
-                float traversalCost = Mathf.Clamp01(nodeB.traversalMaxCost / maxCostDistance);
+                float scaler = maxCostDistance < 0.1f ? 0.1f : maxCostDistance;
+                float magnitudeScaling = Mathf.Clamp01(meanMagnitude / scaler);
+                float traversalCost = Mathf.Clamp01(nodeB.traversalMaxCost / scaler);
                 
                 if (nodeB.nodeType == Node.NodeType.Opening)
                 {

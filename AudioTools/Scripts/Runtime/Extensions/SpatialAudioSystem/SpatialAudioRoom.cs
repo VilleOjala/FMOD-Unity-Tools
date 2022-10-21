@@ -143,7 +143,7 @@ namespace FMODUnityTools
             {
                 if (spatialAudioManager != null)
                 {
-                    spatialAudioManager.AddCurrentPlayerRoom(this);
+                    spatialAudioManager.AddCurrentListenerRoom(this);
                 }
             }
 
@@ -151,7 +151,7 @@ namespace FMODUnityTools
             {
                 if (spatialAudioManager != null)
                 {
-                    spatialAudioManager.RemoveCurrentPlayerRoom(this);
+                    spatialAudioManager.RemoveCurrentListenerRoom(this);
                 }
             }
         }
