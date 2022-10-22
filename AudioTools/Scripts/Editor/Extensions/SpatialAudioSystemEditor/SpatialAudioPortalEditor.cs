@@ -14,7 +14,6 @@ namespace FMODUnityTools
         SerializedProperty closeEnvelope;
         SerializedProperty openFadeTime;
         SerializedProperty closeFadeTime;
-        SerializedProperty wallOcclusion;
         SerializedProperty initialState;
         SerializedProperty traversalMaxCost;
 
@@ -24,7 +23,6 @@ namespace FMODUnityTools
             closeEnvelope = serializedObject.FindProperty("closeEnvelope");
             openFadeTime = serializedObject.FindProperty("openFadeTime");
             closeFadeTime = serializedObject.FindProperty("closeFadeTime");
-            wallOcclusion = serializedObject.FindProperty("wallOcclusion");
             initialState = serializedObject.FindProperty("initialState");
             traversalMaxCost = serializedObject.FindProperty("traversalMaxCost");
         }
@@ -34,24 +32,14 @@ namespace FMODUnityTools
             DrawDefaultInspector();
             var targetScript = target as SpatialAudioPortal;
             serializedObject.Update();
-
-            if (targetScript.portalType == SpatialAudioPortal.PortalType.Opening)
-            {
-                EditorGUILayout.PropertyField(initialState);
-                EditorGUILayout.PropertyField(openEnvelope);
-                EditorGUILayout.PropertyField(closeEnvelope);
-                EditorGUILayout.PropertyField(openFadeTime);
-                EditorGUILayout.PropertyField(closeFadeTime);
-                EditorGUILayout.PropertyField(traversalMaxCost);
-
-                string debug = string.Copy(targetScript.debugPortalStatus);
-                EditorGUILayout.LabelField(debug);
-            }
-            else
-            {
-                EditorGUILayout.PropertyField(wallOcclusion);
-            }
-
+            EditorGUILayout.PropertyField(initialState);
+            EditorGUILayout.PropertyField(openEnvelope);
+            EditorGUILayout.PropertyField(closeEnvelope);
+            EditorGUILayout.PropertyField(openFadeTime);
+            EditorGUILayout.PropertyField(closeFadeTime);
+            EditorGUILayout.PropertyField(traversalMaxCost);
+            string debug = string.Copy(targetScript.debugPortalStatus);
+            EditorGUILayout.LabelField(debug);
             serializedObject.ApplyModifiedProperties();
         }
     }

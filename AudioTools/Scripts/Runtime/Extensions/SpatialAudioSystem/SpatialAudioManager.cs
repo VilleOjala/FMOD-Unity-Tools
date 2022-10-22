@@ -167,7 +167,7 @@ namespace FMODUnityTools
 
         private struct Node
         {
-            public enum NodeType { Emitter, Wall, Opening, Listener };
+            public enum NodeType { Emitter, Portal, Listener };
 
             public NodeType nodeType;
             public Vector3 position;
@@ -176,16 +176,12 @@ namespace FMODUnityTools
             public float portalClosednessCost;
             public float traversalMaxCost;
 
-            // Only relevant if nodeType == NodeType.Wall
-            public float wallOcclusion;
-
             public Node(NodeType nodeType, Vector3 position, float portalClosednessCost = 0, float traversalMaxCost = 0, float wallOcclusion = 0)
             {
                 this.nodeType = nodeType;
                 this.position = position;
                 this.portalClosednessCost = portalClosednessCost;
                 this.traversalMaxCost = traversalMaxCost;
-                this.wallOcclusion = wallOcclusion;
             }
         }
 
@@ -929,9 +925,6 @@ namespace FMODUnityTools
 
                         var arrivalPortal = route[route.Count - 1];
 
-                        if (arrivalPortal.portalType == SpatialAudioPortal.PortalType.Wall)
-                            continue;
-
                         if (!portalClosestPoints.ContainsKey(arrivalPortal))
                             continue;
 
@@ -1023,12 +1016,11 @@ namespace FMODUnityTools
 
                 if (portal != null && closestPoints.ContainsKey(portal))
                 {
-                    var nodeType = portal.portalType == SpatialAudioPortal.PortalType.Opening ? Node.NodeType.Opening : Node.NodeType.Wall;
+                    var nodeType = Node.NodeType.Portal;
                     Vector3 position = closestPoints[portal];
-                    float portalClosednessCost = nodeType == Node.NodeType.Opening ? portal.PortalStatus : 0f;
-                    float traversalMaxCost = nodeType == Node.NodeType.Opening ? portal.traversalMaxCost : 0f;
-                    float wallOcclusion = nodeType == Node.NodeType.Wall ? portal.wallOcclusion : 0f;
-                    routeNodes.Add(new Node(nodeType, position, portalClosednessCost, traversalMaxCost, wallOcclusion));
+                    float portalClosednessCost = nodeType == Node.NodeType.Portal ? portal.PortalStatus : 0f;
+                    float traversalMaxCost = nodeType == Node.NodeType.Portal ? portal.traversalMaxCost : 0f;
+                    routeNodes.Add(new Node(nodeType, position, portalClosednessCost, traversalMaxCost));
                 }
             }
 
@@ -1130,15 +1122,7 @@ namespace FMODUnityTools
                 float scaler = maxCostDistance < 0.1f ? 0.1f : maxCostDistance;
                 float magnitudeScaling = Mathf.Clamp01(meanMagnitude / scaler);
                 float traversalCost = Mathf.Clamp01(nodeB.traversalMaxCost / scaler);
-                
-                if (nodeB.nodeType == Node.NodeType.Opening)
-                {
-                    cost += (magnitudeScaling * (portalDiffraction + traversalCost) + nodeB.portalClosednessCost);
-                }
-                else
-                {
-                    cost += nodeB.wallOcclusion;
-                }
+                cost += (magnitudeScaling * (portalDiffraction + traversalCost) + nodeB.portalClosednessCost);
             }
 
             cost = Mathf.Clamp01(cost);

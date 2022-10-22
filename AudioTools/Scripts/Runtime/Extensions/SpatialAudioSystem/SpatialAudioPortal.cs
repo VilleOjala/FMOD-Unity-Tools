@@ -12,10 +12,8 @@ namespace FMODUnityTools
      Tooltip("Only instantiate Spatial Audio Portals with the 'Add Spatial Audio Protal\" -button of the Spatial Audio Manager.")]
     public class SpatialAudioPortal : MonoBehaviour
     {
-        [Tooltip("Optionally give the portal a unique name for more informative debug messages.")]
+        [Tooltip("Optionally, give the portal a unique name for more informative debug messages.")]
         public string portalName;
-
-        public PortalType portalType = PortalType.Opening;
 
         [HideInInspector]
         public PortalInitialState initialState = PortalInitialState.Open;
@@ -25,12 +23,8 @@ namespace FMODUnityTools
         
         [HideInInspector]
         public MeshRenderer meshRenderer;
-
         private List<SpatialAudioRoom> connectedRooms = new List<SpatialAudioRoom>();
         
-        [Range(0.0f, 1.0f), HideInInspector]
-        public float wallOcclusion = 1.0f;
-
         [HideInInspector]
         [Range(0.0f, 1.0f)]
         public float traversalMaxCost = 0.0f;
@@ -56,12 +50,6 @@ namespace FMODUnityTools
         private bool inProgressOpen = false;
         private bool inProgressClose = false;
 
-        public enum PortalType
-        {
-            Opening,
-            Wall
-        };
-
         public enum PortalInitialState
         {
             Open,
@@ -70,7 +58,7 @@ namespace FMODUnityTools
 
         void Awake()
         {
-            if (portalType == PortalType.Opening && initialState == PortalInitialState.Closed)
+            if (initialState == PortalInitialState.Closed)
             {
                 SetPortalClosed(false);
             }       
@@ -85,28 +73,19 @@ namespace FMODUnityTools
 #if UNITY_EDITOR
         void Update()
         {
-            if (portalType == PortalType.Opening)
-            {
-                if (PortalStatus < 1 && inProgressOpen)
-                    debugPortalStatus = "Portal status: Opening";
-                else if(PortalStatus < 1 && inProgressClose)
-                    debugPortalStatus = "Portal status: Closing";
-                else if(!inProgressClose && !inProgressOpen && PortalStatus < 1)
-                    debugPortalStatus = "Portal status: Open";
-                else if(!inProgressClose && !inProgressOpen)
-                    debugPortalStatus = "Portal status: Closed";
-            }
+            if (PortalStatus < 1 && inProgressOpen)
+                debugPortalStatus = "Portal status: Opening";
+            else if(PortalStatus < 1 && inProgressClose)
+                debugPortalStatus = "Portal status: Closing";
+            else if(!inProgressClose && !inProgressOpen && PortalStatus < 1)
+                debugPortalStatus = "Portal status: Open";
+            else if(!inProgressClose && !inProgressOpen)
+                debugPortalStatus = "Portal status: Closed";            
         }
 #endif
 
         public void SetPortalClosed(bool allowFade)
         {
-            if (portalType == PortalType.Wall)
-            {
-                Debug.LogWarning("Cannot set portal '" + gameObject.name + "' as 'closed', since it is a wall.");
-                return;
-            }
-
             if (allowFade)
             {
                 StartCoroutine(ClosePortal(PortalStatus, closeFadeTime));
@@ -119,12 +98,6 @@ namespace FMODUnityTools
 
         public void SetPortalOpen(bool allowFade)
         {
-            if (portalType == PortalType.Wall)
-            {
-                Debug.LogWarning("Cannot set portal '" + gameObject.name + "' as 'open', since it is a wall.");
-                return;
-            }
-
             if (allowFade)
             {
                 StartCoroutine(OpenPortal(PortalStatus, openFadeTime));
