@@ -15,7 +15,7 @@ namespace FMODUnityTools
         SerializedProperty openFadeTime;
         SerializedProperty closeFadeTime;
         SerializedProperty initialState;
-        SerializedProperty traversalCost;
+        SerializedProperty maxClosednessCost;
 
         void OnEnable()
         {
@@ -24,7 +24,7 @@ namespace FMODUnityTools
             openFadeTime = serializedObject.FindProperty("openFadeTime");
             closeFadeTime = serializedObject.FindProperty("closeFadeTime");
             initialState = serializedObject.FindProperty("initialState");
-            traversalCost = serializedObject.FindProperty("traversalCost");
+            maxClosednessCost = serializedObject.FindProperty("maxClosednessCost");
         }
 
         public override void OnInspectorGUI()
@@ -37,7 +37,7 @@ namespace FMODUnityTools
             EditorGUILayout.PropertyField(closeEnvelope);
             EditorGUILayout.PropertyField(openFadeTime);
             EditorGUILayout.PropertyField(closeFadeTime);
-            EditorGUILayout.PropertyField(traversalCost);
+            EditorGUILayout.PropertyField(maxClosednessCost);
             string debug = string.Copy(targetScript.debugPortalStatus);
             EditorGUILayout.LabelField(debug);
             serializedObject.ApplyModifiedProperties();

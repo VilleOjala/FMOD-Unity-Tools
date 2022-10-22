@@ -27,7 +27,7 @@ namespace FMODUnityTools
         
         [HideInInspector]
         [Range(0.0f, 1.0f)]
-        public float traversalCost = 0.0f;
+        public float maxClosednessCost = 1.0f;
 
         [HideInInspector]
         public AnimationCurve openEnvelope = new AnimationCurve(new Keyframe(0.0f, 0.0f), new Keyframe(1.0f, 1.0f));

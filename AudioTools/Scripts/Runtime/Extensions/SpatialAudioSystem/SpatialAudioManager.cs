@@ -173,15 +173,15 @@ namespace FMODUnityTools
             public Vector3 position;
 
             // Only relevant if nodeType == NodeType.Opening
-            public float portalClosednessCost;
-            public float traversalCost;
+            public float portalClosednessStatus;
+            public float maxClosednessCost;
 
-            public Node(NodeType nodeType, Vector3 position, float portalClosednessCost = 0, float traversalCost = 0, float wallOcclusion = 0)
+            public Node(NodeType nodeType, Vector3 position, float portalClosednessStatus = 0, float maxClosednessCost = 0)
             {
                 this.nodeType = nodeType;
                 this.position = position;
-                this.portalClosednessCost = portalClosednessCost;
-                this.traversalCost = traversalCost;
+                this.portalClosednessStatus = portalClosednessStatus;
+                this.maxClosednessCost = maxClosednessCost;
             }
         }
 
@@ -1019,7 +1019,7 @@ namespace FMODUnityTools
                     var nodeType = Node.NodeType.Portal;
                     Vector3 position = closestPoints[portal];
                     float portalClosednessCost = nodeType == Node.NodeType.Portal ? portal.PortalStatus : 0f;
-                    float traversalMaxCost = nodeType == Node.NodeType.Portal ? portal.traversalCost : 0f;
+                    float traversalMaxCost = nodeType == Node.NodeType.Portal ? portal.maxClosednessCost : 0f;
                     routeNodes.Add(new Node(nodeType, position, portalClosednessCost, traversalMaxCost));
                 }
             }
@@ -1121,7 +1121,7 @@ namespace FMODUnityTools
                 float portalDiffraction = angle / 180;
                 float scaler = maxCostDistance < 0.1f ? 0.1f : maxCostDistance;
                 float magnitudeScaling = Mathf.Clamp01(meanMagnitude / scaler);
-                cost += (magnitudeScaling * (portalDiffraction + nodeB.traversalCost) + nodeB.portalClosednessCost);
+                cost += magnitudeScaling * portalDiffraction + nodeB.portalClosednessStatus * nodeB.maxClosednessCost;
             }
 
             cost = Mathf.Clamp01(cost);
