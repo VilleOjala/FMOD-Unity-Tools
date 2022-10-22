@@ -174,14 +174,14 @@ namespace FMODUnityTools
 
             // Only relevant if nodeType == NodeType.Opening
             public float portalClosednessCost;
-            public float traversalMaxCost;
+            public float traversalCost;
 
-            public Node(NodeType nodeType, Vector3 position, float portalClosednessCost = 0, float traversalMaxCost = 0, float wallOcclusion = 0)
+            public Node(NodeType nodeType, Vector3 position, float portalClosednessCost = 0, float traversalCost = 0, float wallOcclusion = 0)
             {
                 this.nodeType = nodeType;
                 this.position = position;
                 this.portalClosednessCost = portalClosednessCost;
-                this.traversalMaxCost = traversalMaxCost;
+                this.traversalCost = traversalCost;
             }
         }
 
@@ -1019,7 +1019,7 @@ namespace FMODUnityTools
                     var nodeType = Node.NodeType.Portal;
                     Vector3 position = closestPoints[portal];
                     float portalClosednessCost = nodeType == Node.NodeType.Portal ? portal.PortalStatus : 0f;
-                    float traversalMaxCost = nodeType == Node.NodeType.Portal ? portal.traversalMaxCost : 0f;
+                    float traversalMaxCost = nodeType == Node.NodeType.Portal ? portal.traversalCost : 0f;
                     routeNodes.Add(new Node(nodeType, position, portalClosednessCost, traversalMaxCost));
                 }
             }
@@ -1121,8 +1121,7 @@ namespace FMODUnityTools
                 float portalDiffraction = angle / 180;
                 float scaler = maxCostDistance < 0.1f ? 0.1f : maxCostDistance;
                 float magnitudeScaling = Mathf.Clamp01(meanMagnitude / scaler);
-                float traversalCost = Mathf.Clamp01(nodeB.traversalMaxCost / scaler);
-                cost += (magnitudeScaling * (portalDiffraction + traversalCost) + nodeB.portalClosednessCost);
+                cost += (magnitudeScaling * (portalDiffraction + nodeB.traversalCost) + nodeB.portalClosednessCost);
             }
 
             cost = Mathf.Clamp01(cost);
