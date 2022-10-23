@@ -22,11 +22,6 @@ namespace FMODUnityTools
         public LayerMask obstructionLayerMask;
         public QueryTriggerInteraction obstructionQueryTriggers = QueryTriggerInteraction.Ignore;
 
-        [SerializeField, Tooltip("Collider to ignore when checking for obstruction.")]
-        private Collider ignoreSelfCollider;
-        public Collider IgnoreSelfCollider { get => ignoreSelfCollider; set => ignoreSelfCollider = value; }
-        public bool requireObstructionTag = true;
-
         [Tooltip("Controls the overall width of the raycast pattern used in the obstruction mode.")]
         [Range(0.0f, 10.0f)]
         public float obstructionRaycastSpread = 1.3f;
@@ -61,9 +56,6 @@ namespace FMODUnityTools
         <- At least in the case of stationary sounds, it is a good practice to assign a starting room for this small performance boost.
         */
         private Dictionary<SpatialAudioRoom, List<SpatialAudioRoom>> orderedConnections = new Dictionary<SpatialAudioRoom, List<SpatialAudioRoom>>();
-
-        // If the 'Require Obstruction Tag' -mode is active, the SpatialAudioObstructionTag instances populate this list with their associated colliders. 
-        private HashSet<Collider> obstructingColliders = new HashSet<Collider>();
 
         private List<RoomAwareInstance> instancesWithKnownRoom = new List<RoomAwareInstance>();
         private List<RoomAwareInstance> instancesWithUnknownRoom = new List<RoomAwareInstance>();
@@ -332,32 +324,6 @@ namespace FMODUnityTools
             {
                 currentListenerRooms.Remove(room);
             }
-        }
-
-        public void AddObstructingCollider(Collider collider)
-        {
-            if (!obstructingColliders.Contains(collider))
-            {
-                obstructingColliders.Add(collider);
-            }
-        }
-
-        public void RemoveObstructingCollider(Collider collider)
-        {
-            if (obstructingColliders.Contains(collider))
-            {
-                obstructingColliders.Remove(collider);
-            }
-        }
-
-        public bool IsObstructingCollider(Collider collider)
-        {
-            if (obstructingColliders.Contains(collider))
-            {
-                return true;
-            }
-
-            return false;
         }
 
         #endregion
@@ -730,9 +696,9 @@ namespace FMODUnityTools
                 debug = true;
             }
 #endif
-            float obstruction = SpatialAudioObstructionChecker.ObstructionCheck(listenerPosition, emitterPostion,requireObstructionTag, 
-                                                                                obstructionLayerMask, obstructionQueryTriggers,
-                                                                                obstructionRaycastSpread, debug, ignoreSelfCollider);
+            float obstruction = SpatialAudioObstructionChecker.ObstructionCheck(listenerPosition, emitterPostion, obstructionLayerMask, 
+                                                                                obstructionQueryTriggers, obstructionRaycastSpread, 
+                                                                                debug);
             SetParameterValue(obstructionID, obstruction, eventInstance);
         }
 
