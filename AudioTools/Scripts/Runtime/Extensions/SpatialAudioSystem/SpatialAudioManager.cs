@@ -31,9 +31,6 @@ namespace FMODUnityTools
         [Range(0.0f, 10.0f)]
         public float obstructionRaycastSpread = 1.3f;
 
-        [Range(0.1f, 30.0f)]
-        public float maxCostDistance = 0.1f;
-
         [SerializeField, Range(1, 8), Tooltip("The maximum number of rooms that will be visited when searching for routes between two rooms.")]
         private int maxPropagationDepth = 8;
         public int MaxPropagationDepth { get { return maxPropagationDepth; } }
@@ -1038,7 +1035,6 @@ namespace FMODUnityTools
                     continue;
 
                 SetParameterValue(instance.propagationID, Parameters.PropagationCostMinValue, instance.eventInstance);
-
                 instance.eventInstance.setProperty(EVENT_PROPERTY.MAXIMUM_DISTANCE, instance.maxDistance);
             }
         }
@@ -1096,7 +1092,6 @@ namespace FMODUnityTools
 
                 float magnitudeAB = dirAB.magnitude;
                 float magnitudeBC = dirBC.magnitude;
-                float meanMagnitude = (magnitudeAB + magnitudeBC) / 2;
 
                 if (i == routeNodes.Count - 3)
                 {
@@ -1119,9 +1114,7 @@ namespace FMODUnityTools
                 }
 
                 float portalDiffraction = angle / 180;
-                float scaler = maxCostDistance < 0.1f ? 0.1f : maxCostDistance;
-                float magnitudeScaling = Mathf.Clamp01(meanMagnitude / scaler);
-                cost += magnitudeScaling * portalDiffraction + nodeB.portalClosednessStatus * nodeB.maxClosednessCost;
+                cost += portalDiffraction + nodeB.portalClosednessStatus * nodeB.maxClosednessCost;
             }
 
             cost = Mathf.Clamp01(cost);
