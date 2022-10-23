@@ -3,8 +3,6 @@ Audio Implementation Tools for FMOD and Unity\
 MIT License\
 Copyright 2022, Ville Ojala
 
-DESCRIPTION
-
 A synergistic set of audio implementation tools for the interface of Unity game engine and FMOD audio middleware.
 
 - Assorted triggering, playback and randomization features
@@ -17,9 +15,7 @@ A synergistic set of audio implementation tools for the interface of Unity game 
 - Room-portal -based sound occlusion system 
 - Raycast-based obstruction 
 
-DOCUMENTATION
-
-*A major rewrite of the whole toolset was pushed on 14.10.22, which made most of the previously available documentation obsolete. I will do my best to get the documentation updated in the near future.*
+[User Guide](https://docs.google.com/document/d/1R93XkZ6GyAz8rPzh-XjItQsgMcROJFcYK2rVS8gwj4U/edit?usp=sharing)
 
 Third party dependencies:
 
