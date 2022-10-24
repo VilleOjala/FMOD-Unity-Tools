@@ -5,7 +5,6 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Assertions.Must;
 
 namespace FMODUnityTools
 {
@@ -119,11 +118,10 @@ namespace FMODUnityTools
             }
 
             // Sanity checks completed. Next, we will programatically set this room be one of the two rooms that any portal found in room connections connects.
-            // <- This reduces the need for manual set-up in editor. 
-            // <- In addition, the availability of "other-way-around" references simplifies the propagation cost code.
+            //  <-This reduces the need for manual set-up in the Editor. 
+            //  <-In addition, the availability of "other-way-around" references simplifies the propagation cost code.
             // In a proper spatial audio geometry setup, each portal can only connect two rooms. 
-            // <- An error is thrown if more than two rooms try to assign themselves to a single portal.
-
+            //  <-An error is thrown if more than two rooms try to assign themselves to a single portal.
             for (int i = 0; i < roomConnections.Count; i++)
             {
                 var roomConnection = roomConnections[i];

@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace FMODUnityTools
 {
-    [CreateAssetMenu(fileName = "KeyOffsetData", menuName = "FMOD Unity Tools/Key Offset Data", order = 4)]
+    [CreateAssetMenu(fileName = "KeyOffsetData", menuName = "FMOD Unity Tools/Key Offset Data")]
     public class KeyOffsetData : ScriptableObject
     {
         public List<KeyOffset> keyOffsets = new List<KeyOffset>();

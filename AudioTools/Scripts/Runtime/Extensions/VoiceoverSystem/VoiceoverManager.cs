@@ -87,8 +87,8 @@ namespace FMODUnityTools
             }
         }
 
-        // Game's dialogue system should call this function to start playing voiceovers for a new dialogue 
-        // or to provide the next line in an already playing dialogue when it receives a release callback from the VoiceoverManager.
+        // Game's dialogue system should call this function to start playing voiceovers for a new dialogue, 
+        // or to provide the next line in an already playing dialogue when it receives a callback from the VoiceoverManager.
         public void PlayDialogue(Speaker speaker, string key, string dialogueName)
         {
             if (playbackHandlersBySpeaker.ContainsKey(speaker))
@@ -107,9 +107,9 @@ namespace FMODUnityTools
                     releaseOffset = keyOffsetPairs[key];
                 }
 
-                // If return = -1 <- something unexpected failed in starting the dialogue.
-                // If return = 0 <- the speaker is busy with another dialogue line, queue this line and try again once the speaker reports that is free.
-                // If return = 1 <- starting the line succeeded.
+                // result == -1 -> something unexpected failed in starting the dialogue line.
+                // result == 0  -> the speaker is busy with another dialogue line, queue this line and try again once the speaker reports that it is now available
+                // result == 1  -> starting the dialogue line succeeded.
                 int result = playbackHandler.PlayVoiceover(key, dialogueName, releaseOffset);
 
                 if (result == 1)
@@ -141,7 +141,7 @@ namespace FMODUnityTools
             }
         }
 
-        // It is the responsibility of the game's dialogue system to inform the Voiceover Manager that a particular dialogue has finished playing.
+        // It is the responsibility of the game's dialogue system to inform VoiceoverManager that a particular dialogue has finished.
         public void SetDialogueFinished (string dialogueName)
         {
             if (activeDialogues.ContainsKey(dialogueName))

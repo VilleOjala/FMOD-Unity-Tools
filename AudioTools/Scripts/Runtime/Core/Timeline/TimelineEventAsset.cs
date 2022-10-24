@@ -21,7 +21,6 @@ namespace FMODUnityTools
             audioEventBehaviour.eventTag = eventTag;
             audioEventBehaviour.controlAction = controlAction;
             audioEventBehaviour.parameters = parameters;
-
             return playable;
         }
     }

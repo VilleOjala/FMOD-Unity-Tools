@@ -92,10 +92,10 @@ namespace FMODUnityTools
                     {
                         foreach (var eventTag in eventTags)
                         {
-                            if (eventTag != null)
-                            {
-                                EventManager.PostEvent(new ControlActionEventArguments(eventTag, controlAction, parameters));
-                            }
+                            if (eventTag == null)
+                                continue;
+
+                            EventManager.PostEvent(new ControlActionEventArguments(eventTag, controlAction, parameters));
                         }
                     }
                     break;
@@ -103,10 +103,10 @@ namespace FMODUnityTools
                     {
                         foreach (var audioObject in audioObjects)
                         {
-                            if (audioObject != null)
-                            {
-                                audioObject.Control(controlAction, parameters);
-                            }
+                            if (audioObject == null)
+                                continue;
+
+                            audioObject.Control(controlAction, parameters);
                         }
                     }
                     break;

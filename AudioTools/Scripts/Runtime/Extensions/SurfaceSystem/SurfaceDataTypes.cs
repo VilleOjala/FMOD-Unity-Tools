@@ -2,16 +2,15 @@
 // MIT License
 // https://github.com/VilleOjala/FMOD-Unity-Tools
 
-using FMOD;
 using System;
 using UnityEngine;
 
 namespace FMODUnityTools
 {
-    // Surfaces can be added / removed as per project's needs, except the value 'Water' should always be included,
-    // since the logic in 'SurfaceChecker' -class for figuring out the water depth is only done if the surface type is first
+    // Surfaces can be added / removed as per project's needs, except 'Water' should always stay included,
+    // since the logic in SurfaceChecker class for figuring out the water depth is only done if the type of surface is first
     // determined to be 'Water'.
-    // The numbering of parameter options inside FMOD Studio should match those in SurfaceType and WaterDepth enums,
+    // The numbering of parameter options inside FMOD Studio authoring tool should match those in SurfaceType and WaterDepth enums,
     // since numbers (instead of string labels) are used for parameter setting in this toolset.
 
     public enum SurfaceType

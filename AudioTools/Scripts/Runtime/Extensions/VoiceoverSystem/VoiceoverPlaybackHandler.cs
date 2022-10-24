@@ -74,7 +74,7 @@ namespace FMODUnityTools
             }
             else if (voiceoverInstance.isValid())
             {
-                // Stop the current dialogue with a quick fade out and then start the new line.
+                // Stop the current dialogue line with a quick fade out and then start the new line.
                 // <- No click/pop stops, but also enforces speaker monophony.
                 voiceoverInstance.stop(FMOD.Studio.STOP_MODE.ALLOWFADEOUT);
 
@@ -84,10 +84,10 @@ namespace FMODUnityTools
                     coroutineRunning = false;
                 }
 
-                // Inform voiceover manager that the playback handler is busy stopping the previous dialogue line and it should queue the line.
+                // Inform VoiceoverManager that the playback handler is busy stopping the previous dialogue line and it should queue the line.
                 return 0;        
             }
-            else // If we are on a customly assigned pacing wait after a line has stopped playing let's abort this wait and start the new line immediately.
+            else // If we are on a customly assigned pacing wait after a line has stopped playing, let's abort this wait and start the new line immediately.
             {
                 if (coroutineRunning)
                 {

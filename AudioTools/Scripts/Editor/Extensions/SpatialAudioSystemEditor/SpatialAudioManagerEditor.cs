@@ -43,7 +43,7 @@ namespace FMODUnityTools
             GUILayout.Label("", GUILayout.Width(EditorGUIUtility.labelWidth));
             if (GUILayout.Button("Add Spatial Audio Portal"))
             {
-                GameObject portalGameObj = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                var portalGameObj = GameObject.CreatePrimitive(PrimitiveType.Quad);
                 portalGameObj.name = "SpatialAudioPortal";
                 portalGameObj.transform.SetParent(targetScript.transform);
                 portalGameObj.transform.position = new Vector3(0, 0.5f, 0);

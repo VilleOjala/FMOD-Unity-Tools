@@ -178,7 +178,6 @@ namespace FMODUnityTools
             }        
         }
 
-        // Default value should be set to '1' inside FMOD Studio
         private void ResetParameterValues()
         {
             if (initializationSuccesfull)

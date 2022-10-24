@@ -4,7 +4,7 @@
 
 namespace FMODUnityTools
 {
-    // When using the VoiceoverSystem, all speakers in the game should be assigned with a unique value here.
+    // All speakers in the game should be assigned with a unique value here.
     public enum Speaker
     {
         ExampleCharacterA,

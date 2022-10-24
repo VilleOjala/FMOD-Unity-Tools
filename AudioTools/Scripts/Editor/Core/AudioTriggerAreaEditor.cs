@@ -68,8 +68,6 @@ namespace FMODUnityTools
 
             if (GUILayout.Button("Toggle Debug Colors On/Off"))
             {
-                // Do this the ugly way..
-
                 toggleState = !toggleState;
                 var meshRenderers = targetScript.gameObject.GetComponentsInChildren<MeshRenderer>();
 

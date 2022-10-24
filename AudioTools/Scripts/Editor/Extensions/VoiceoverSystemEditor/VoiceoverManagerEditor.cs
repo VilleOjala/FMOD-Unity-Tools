@@ -18,7 +18,7 @@ namespace FMODUnityTools
 
             if (GUILayout.Button("Add Voiceover Playback Handler"))
             {
-                GameObject newGameObj = new GameObject("VoiceoverPlaybackHandler");
+                var newGameObj = new GameObject("VoiceoverPlaybackHandler");
                 newGameObj.transform.SetParent(targetScript.transform);
                 var playbackHandler = newGameObj.AddComponent<VoiceoverPlaybackHandler>();
                 targetScript.voiceoverPlaybackHandlers.Add(playbackHandler);
@@ -38,6 +38,7 @@ namespace FMODUnityTools
                     targetScript.voiceoverPlaybackHandlers.Add(playbackHandlers[i]);
                 }
             }
+
             EditorGUILayout.EndHorizontal();
         }
     }

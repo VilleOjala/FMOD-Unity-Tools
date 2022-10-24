@@ -30,7 +30,7 @@ namespace FMODUnityTools
 
         [SerializeField]
         private TriggererType triggererType = TriggererType.Listener;
-        public TriggererType Triggerer { get => triggererType; } //TODO Naming
+        public TriggererType Triggerer { get => triggererType; } 
 
         [HideInInspector]
         public LayerMask layerMask;
@@ -41,8 +41,7 @@ namespace FMODUnityTools
         void Awake()
         {
             // Always disable debug trigger meshes when going to the playmode to avoid accidentally leaving them on. 
-            // <- Doing this without references is a bit ugly / bug prone, though.
-            // Colors can be manually turned on again at runtime by using the 'Toggle Debug Colors On/Off' inspector button.
+            // Colors can be manually turned on again at runtime by using the 'Toggle Debug Colors On/Off' Inspector button.
             var meshRenderers = gameObject.GetComponentsInChildren<MeshRenderer>();
 
             for (int i = 0; i < meshRenderers.Length; i++)

@@ -34,7 +34,7 @@ namespace FMODUnityTools
         public void CreateBlendArea()
         {
             var targetScript = target as ReverbBlendZone;
-            GameObject reverBlendZoneGameObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var reverBlendZoneGameObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
             reverBlendZoneGameObj.transform.parent = targetScript.transform;
             targetScript.blendArea = reverBlendZoneGameObj;
             var zoneBoxCollider = reverBlendZoneGameObj.GetComponent<BoxCollider>();
