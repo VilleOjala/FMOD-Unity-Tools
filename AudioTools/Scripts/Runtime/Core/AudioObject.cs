@@ -24,6 +24,9 @@ namespace FMODUnityTools
         [SerializeField, Tooltip("For 3D sounds. If left empty, sounds follow the position of this Game Object.")]
         private Transform followTarget;
 
+        [SerializeField, Tooltip("For 3D sounds requiring velocity updates")]
+        private Rigidbody rb;
+
         /// <summary>
         /// Changing the followed target does not affect already playing instances.
         /// </summary>
@@ -45,7 +48,22 @@ namespace FMODUnityTools
 
                 followTarget = value;           
             }
-        }            
+        }
+
+        /// <summary>
+        /// Changing the target rigidbody does not affect already playing instances.
+        /// </summary>
+        public Rigidbody TargetRigidbody
+        {
+            get
+            {
+                return rb;
+            }
+            set 
+            { 
+                rb = value;              
+            }
+        }
              
         public List<EventReference> eventReferences = new List<EventReference>();
         private List<EventDescription> eventDescriptions = new List<EventDescription>();
@@ -140,7 +158,6 @@ namespace FMODUnityTools
 
             if (is3D)
             {
-                var rb = FollowTarget.gameObject.GetComponent<Rigidbody>();
                 RuntimeManager.AttachInstanceToGameObject(eventInstance, FollowTarget, rb);
 
                 if (spatialAudioRoomAware)
