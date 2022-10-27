@@ -153,7 +153,7 @@ namespace FMODUnityTools
             }
 
             eventDescription.createInstance(out EventInstance eventInstance);
-            SetLocalParameters(parameters);
+            SetLocalParameters(eventInstance, parameters);
             eventDescription.is3D(out bool is3D);
 
             if (is3D)
@@ -200,11 +200,11 @@ namespace FMODUnityTools
                         InstantiateAudioObject(parameters);
                     break;
                 case ControlAction.Stop:
-                        SetLocalParameters(parameters);
+                        SetLocalParametersForAll(parameters);
                         StopAllInstances();
                     break;
                 case ControlAction.UpdateParameters:
-                        SetLocalParameters(parameters);
+                        SetLocalParametersForAll(parameters);
                     break;
             }
         }
@@ -226,28 +226,30 @@ namespace FMODUnityTools
             }
         }
 
-        public void SetLocalParameters(params ParamRef[] parameters)
+        public void SetLocalParametersForAll(params ParamRef[] parameters)
         {
-            if (parameters == null)
-                return;
-
             foreach (var eventInstance in eventInstances)
             {
-                if (!eventInstance.isValid())
+                SetLocalParameters(eventInstance, parameters);
+            }
+        }
+
+        private void SetLocalParameters(EventInstance eventInstance, params ParamRef[] parameters)
+        {
+            if (parameters == null || !eventInstance.isValid())
+                return;
+
+            foreach (var parameter in parameters)
+            {
+                if (parameter == null || string.IsNullOrEmpty(parameter.Name))
                     continue;
 
-                foreach (var parameter in parameters)
+                var result = eventInstance.setParameterByName(parameter.Name, parameter.Value);
+
+                if (result != FMOD.RESULT.OK)
                 {
-                    if (parameter == null || string.IsNullOrEmpty(parameter.Name))
-                        continue;
-
-                    var result = eventInstance.setParameterByName(parameter.Name, parameter.Value);
-
-                    if (result != FMOD.RESULT.OK)
-                    {
-                        Debug.LogWarning("Setting a value for local parameter '" + parameter.Name +
-                                         "' failed for '" + gameObject.name + "'. Fmod error: " + result);
-                    }
+                    Debug.LogWarning("Setting a value for local parameter '" + parameter.Name +
+                                     "' failed for '" + gameObject.name + "'. Fmod error: " + result);
                 }
             }
         }
