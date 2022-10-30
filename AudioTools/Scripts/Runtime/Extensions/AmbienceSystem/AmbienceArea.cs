@@ -167,14 +167,14 @@ namespace FMODUnityTools
             {
                 StartFeederIfNotPlaying();
                 StartOrUpdateOutput(1f);
-                StartOrUpdateWithinRangePortalOutputs(audible: false);
+                StartOrUpdateWithinRangePortalOutputs(isAudible: false);
                 StopOutsideRangePortalOutputs();
             }
             else if (!isInsideAmbienceArea && hasPortalOutputsWithinRange)
             {
                 StartFeederIfNotPlaying();
                 StartOrUpdateOutput(0f);
-                StartOrUpdateWithinRangePortalOutputs(audible: true);
+                StartOrUpdateWithinRangePortalOutputs(isAudible: true);
                 StopOutsideRangePortalOutputs();
             }
             else if (isInsideAmbienceArea && !hasPortalOutputsWithinRange)
@@ -235,7 +235,7 @@ namespace FMODUnityTools
             }
         }
 
-        private void StartOrUpdateWithinRangePortalOutputs(bool audible)
+        private void StartOrUpdateWithinRangePortalOutputs(bool isAudible)
         {
             if (!portalOutputDescription.isValid())
                 return;
@@ -245,7 +245,7 @@ namespace FMODUnityTools
                 if (portalOutput == null || !portalOutput.isWithinRange)
                     continue;
 
-                float volume = audible ? portalOutput.weight : 0f;
+                float volume = isAudible ? portalOutput.weight : 0f;
 
                 if (!portalOutput.eventInstance.isValid())
                 {

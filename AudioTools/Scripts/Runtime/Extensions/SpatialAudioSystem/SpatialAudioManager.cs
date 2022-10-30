@@ -348,7 +348,7 @@ namespace FMODUnityTools
             // since they will be again needed later on during the check protocol.
             audibleInstances.Clear();
             instanceToListenerDistances.Clear();
-            CheckInstanceAudibility(ref audibleInstances, ref instanceToListenerDistances);
+            CheckInstanceAudibility(audibleInstances, instanceToListenerDistances);
 
             if (activeModes.HasFlag(ActiveModes.PropagationCost) && currentListenerRooms != null && currentListenerRooms.Count > 0)
             {
@@ -359,7 +359,7 @@ namespace FMODUnityTools
                 // If the current room was known previously, a new room check is only performed when the position of the registree has changed.
                 instancesWithKnownRoom.Clear();
                 instancesWithUnknownRoom.Clear();
-                UpdateRegisteredInstanceRoom(ref instancesWithKnownRoom, ref instancesWithUnknownRoom);
+                UpdateRegisteredInstanceRoom(instancesWithKnownRoom, instancesWithUnknownRoom);
 
                 // If the registree room cannot be determined, we will remove all propagation cost and obsruction from it.
                 // <- Lesser evil than potentially missing hearing some vital audio, such as dialogue etc. 
@@ -372,7 +372,7 @@ namespace FMODUnityTools
                 // Split the obtained relevant registered instances to those which are in the current listener room and to those located in some other rooms.
                 instancesInListenerRoom.Clear();
                 instancesInOtherRooms.Clear();
-                DivideInstancesByListenerRelativePosition(ref instancesWithKnownRoom, ref instancesInListenerRoom, ref instancesInOtherRooms, currentListenerRoom);
+                DivideInstancesByListenerRelativePosition(instancesWithKnownRoom, instancesInListenerRoom, instancesInOtherRooms, currentListenerRoom);
 
                 // Remove any previously added propagation cost from registered instances that are in the same room with the listener.
                 ResetPropagationCost(instancesInListenerRoom);
@@ -484,7 +484,7 @@ namespace FMODUnityTools
             return prioritizedRoom;
         }
 
-        private void UpdateRegisteredInstanceRoom(ref List<RoomAwareInstance> instancesWithKnownRoom, ref List<RoomAwareInstance> instancesWithUnknownRoom)
+        private void UpdateRegisteredInstanceRoom(List<RoomAwareInstance> instancesWithKnownRoom, List<RoomAwareInstance> instancesWithUnknownRoom)
         {
             foreach (var instance in registeredInstances)
             {
@@ -617,7 +617,7 @@ namespace FMODUnityTools
             return (posA - posB).sqrMagnitude < Mathf.Epsilon * Mathf.Epsilon;
         }
 
-        private void CheckInstanceAudibility(ref List<RoomAwareInstance> listForAudibleInstances, ref Dictionary<RoomAwareInstance, float> listenerToEmitterDistances)
+        private void CheckInstanceAudibility(List<RoomAwareInstance> listForAudibleInstances, Dictionary<RoomAwareInstance, float> listenerToEmitterDistances)
         {
             foreach (var instance in registeredInstances)
             {
@@ -636,9 +636,9 @@ namespace FMODUnityTools
         }
 
         // Divides instances based on whether they are located in the same room with the listener or inside some other room.
-        private void DivideInstancesByListenerRelativePosition(ref List<RoomAwareInstance> allRelevantInstances, 
-                                                               ref List<RoomAwareInstance> instancesInListenerRoom, 
-                                                               ref List<RoomAwareInstance> instancesInOtherRooms, 
+        private void DivideInstancesByListenerRelativePosition(List<RoomAwareInstance> allRelevantInstances, 
+                                                               List<RoomAwareInstance> instancesInListenerRoom, 
+                                                               List<RoomAwareInstance> instancesInOtherRooms, 
                                                                SpatialAudioRoom currentListenerRoom)
         {
             foreach (var instance in allRelevantInstances)
@@ -668,7 +668,7 @@ namespace FMODUnityTools
 
         #region Obstruction
 
-        private void CheckObstruction(in List<RoomAwareInstance> instances)
+        private void CheckObstruction(List<RoomAwareInstance> instances)
         {
             if (instances == null)
                 return;
@@ -839,7 +839,7 @@ namespace FMODUnityTools
                 }
 
                 portalClosestPoints.Clear();
-                GetClosestPointsOnPortals(instancePosition, listenerPosition, ref portalClosestPoints);
+                GetClosestPointsOnPortals(instancePosition, listenerPosition, portalClosestPoints);
 
                 float lowestCost = float.MaxValue;
                 float routeLength = float.MaxValue;
@@ -849,8 +849,8 @@ namespace FMODUnityTools
                 {
                     var routeAlternative = roomPair.routeAlternatives[i];
                     routeNodes.Clear();
-                    GetRouteNodes(instancePosition, listenerPosition, in routeAlternative, in portalClosestPoints, ref routeNodes);
-                    GetRouteCostAndDistance(in routeNodes, out float cost, out float distance);
+                    GetRouteNodes(instancePosition, listenerPosition, routeAlternative, portalClosestPoints, routeNodes);
+                    GetRouteCostAndDistance(routeNodes, out float cost, out float distance);
 
                     int lastIndex = routeAlternative.Count - 1;
 
@@ -927,7 +927,7 @@ namespace FMODUnityTools
             return false;
         }
 
-        private void GetClosestPointsOnPortals(Vector3 instancePosition, Vector3 listenerPosition, ref Dictionary<SpatialAudioPortal, Vector3> closestPoints)
+        private void GetClosestPointsOnPortals(Vector3 instancePosition, Vector3 listenerPosition, Dictionary<SpatialAudioPortal, Vector3> closestPoints)
         {
             Vector3 direction = (listenerPosition - instancePosition).normalized;
             var ray = new Ray(instancePosition, direction);
@@ -964,7 +964,7 @@ namespace FMODUnityTools
             }
         }
 
-        private void GetRouteNodes(Vector3 instancePosition, Vector3 listenerPosition, in List<SpatialAudioPortal> routePortals, in Dictionary<SpatialAudioPortal, Vector3> closestPoints, ref List<Node> routeNodes)
+        private void GetRouteNodes(Vector3 instancePosition, Vector3 listenerPosition, List<SpatialAudioPortal> routePortals, in Dictionary<SpatialAudioPortal, Vector3> closestPoints, List<Node> routeNodes)
         {
             routeNodes.Add(new Node(Node.NodeType.Emitter, instancePosition));
 
@@ -1033,7 +1033,7 @@ namespace FMODUnityTools
             }
         }
 
-        private void GetRouteCostAndDistance(in List<Node> routeNodes, out float cost, out float distance)
+        private void GetRouteCostAndDistance(List<Node> routeNodes, out float cost, out float distance)
         {
             cost = 0f;
             distance = 0f;
