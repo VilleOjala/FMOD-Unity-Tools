@@ -115,7 +115,7 @@ namespace FMODUnityTools
                 if (portalOutput == null)
                     continue;
 
-                if (portalOutput.portalCollider == null || portalOutput.portalCollider == null)
+                if (portalOutput.portalCollider == null)
                 {
                     portalOutput.isWithinRange = false;
                     continue;
