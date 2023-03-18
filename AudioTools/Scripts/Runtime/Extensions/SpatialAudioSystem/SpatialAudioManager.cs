@@ -803,7 +803,7 @@ namespace FMODUnityTools
 
                         uint roomA_ID = roomUniqueIDs[roomA];
                         uint roomB_ID = roomUniqueIDs[roomB];
-                        string roomPairID = roomA_ID.ToString() + roomB_ID.ToString();
+                        string roomPairID = roomA_ID.ToString("D2") + roomB_ID.ToString("D2");
 
                         if (relevantRoomPairsByRoom.ContainsKey(roomA))
                         {
