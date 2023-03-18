@@ -718,6 +718,12 @@ namespace FMODUnityTools
 
         private void InitializeRoomPairRouteAlternatives()
         {
+            if (validSpatialAudioRooms.Count > 1000)
+            {
+                Debug.LogError("The maximum number of rooms is 1000.");
+                return;
+            }
+
             for (int i = 0; i < validSpatialAudioRooms.Count; i++)
             {
                 var roomA = validSpatialAudioRooms[i];
@@ -803,7 +809,7 @@ namespace FMODUnityTools
 
                         uint roomA_ID = roomUniqueIDs[roomA];
                         uint roomB_ID = roomUniqueIDs[roomB];
-                        string roomPairID = roomA_ID.ToString("D2") + roomB_ID.ToString("D2");
+                        string roomPairID = roomA_ID.ToString("D3") + roomB_ID.ToString("D3");
 
                         if (relevantRoomPairsByRoom.ContainsKey(roomA))
                         {
