@@ -40,8 +40,8 @@ namespace FMODUnityTools
 
         void Awake()
         {
-            // Always disable debug trigger meshes when going to the playmode to avoid accidentally leaving them on. 
-            // Colors can be manually turned on again at runtime by using the 'Toggle Debug Colors On/Off' Inspector button.
+            /* Always disable debug trigger meshes when going to the playmode to avoid accidentally leaving them on. 
+             * Colors can be manually turned on again at runtime by using the 'Toggle Debug Colors On/Off' Inspector button. */
             var meshRenderers = gameObject.GetComponentsInChildren<MeshRenderer>();
 
             for (int i = 0; i < meshRenderers.Length; i++)

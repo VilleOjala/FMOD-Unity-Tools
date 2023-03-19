@@ -11,7 +11,7 @@ namespace FMODUnityTools
     [CustomEditor(typeof(SpatialAudioManager))]
     public class SpatialAudioManagerEditor : Editor
     {
-        //Change this to your project specific path
+        //Change this to your project specific path.
         private const string DebugMaterialPath = "Assets/Scripts/FMOD-Audio-Tools/FMOD-Unity-Tools/AudioTools/Assets/Materials/DebugTriggerRed.mat";
 
         public override void OnInspectorGUI()
@@ -101,8 +101,8 @@ namespace FMODUnityTools
             serializedObject.ApplyModifiedProperties();
         }
 
-        // Check that each room is reachable from every other room.
-        // Note! Does not enforce that for each connected room pair the connection has been set in both room game objects.
+        /* Check that each room is reachable from every other room. Note that this does not enforce 
+         * that for each connected room pair the connection has been set in both room GameObjects. */
         private void TestGridValidity(SpatialAudioRoom[] allRooms)
         {
             for (int i = 0; i < allRooms.Length; i++)

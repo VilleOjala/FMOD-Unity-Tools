@@ -113,7 +113,7 @@ namespace FMODUnityTools
             if (connectedRooms.Count >= 2)
             {
                 string offendingPortal = (string.IsNullOrEmpty(portalName) ? gameObject.name : portalName);
-                Debug.LogError("Spatial Audio Portal '" + offendingPortal + "' already has been assigned with a pair of rooms that it connects. " +
+                Debug.LogError("SpatialAudioPortal '" + offendingPortal + "' already has been assigned with a room pair to connect. " +
                                "Each portal can only connect one pair of rooms.");
             }
             else if (room != null)

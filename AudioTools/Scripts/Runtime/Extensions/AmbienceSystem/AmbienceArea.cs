@@ -132,9 +132,9 @@ namespace FMODUnityTools
 
                     if (portalOutputMaxDistance > 0)
                     {
-                        // This assumes that the default 'linear squared' roll-off curve in FMOD Spatializer is being used. 
-                        // Unfortunately, there is currently no handy way of polling the curve setting at runtime, which would
-                        // allow automatic adjustment of this equation.
+                        /* This assumes that the default 'linear squared' roll-off curve of FMOD Spatializer is being used. 
+                         * Unfortunately, there is currently no handy way of polling the curve setting at runtime, which would
+                         * allow automatic adjustment of this equation. */
                         portalOutput.normalizedCloseness = Mathf.Pow(Mathf.Clamp01(1 - (distance / portalOutputMaxDistance)), 2f);
                         combinedNormalizedClosenesses += portalOutput.normalizedCloseness;
                     }

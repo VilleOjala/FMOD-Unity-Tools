@@ -203,7 +203,7 @@ namespace FMODUnityTools
 
             ResetJumpingAndLanding();
 
-            // don't try to play a regular step sound immediately after jumping / landing
+            // Don't try to play a regular step sound immediately after jumping / landing.
             if (jumpedOrLanded)
                 return;
 
@@ -347,7 +347,7 @@ namespace FMODUnityTools
                     }
                 }
 
-                message += "Audio Object: " + audioObject.gameObject.name + ", " + "Follow target: " + followTarget.name;
+                message += "AudioObject: " + audioObject.gameObject.name + ", " + "Follow target: " + followTarget.name;
                 Debug.Log(message);
             }
 #endif

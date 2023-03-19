@@ -127,7 +127,7 @@ namespace FMODUnityTools
             {
                 surfaceInfo.surfaceType = SurfaceType.Water;
                 surfaceInfo.position = closestTaggedWaterPoint;
-                float waterDepth = 0;
+                float waterDepth;
 
                 if (distanceToClosestGroundTag <= distanceToClosestTerrain)
                 {

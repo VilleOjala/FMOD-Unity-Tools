@@ -76,7 +76,7 @@ namespace FMODUnityTools
             copyTransformScale.z = 1.0f;
             reverBlendZoneGameObj.transform.localScale = copyTransformScale;
 
-            // Create zone back wall
+            // Create zone back wall.
 
             targetScript.backWall = new GameObject();
             targetScript.backWall.name = "BackWall";

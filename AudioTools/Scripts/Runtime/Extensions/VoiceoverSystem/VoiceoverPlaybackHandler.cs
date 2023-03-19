@@ -74,8 +74,8 @@ namespace FMODUnityTools
             }
             else if (voiceoverInstance.isValid())
             {
-                // Stop the current dialogue line with a quick fade out and then start the new line.
-                // <- No click/pop stops, but also enforces speaker monophony.
+                /* Stop the current dialogue line with a quick fade out and then start the new line.
+                 * This both prevents the occurence of clicks / pops and enforces the speaker monophony. */
                 voiceoverInstance.stop(FMOD.Studio.STOP_MODE.ALLOWFADEOUT);
 
                 if (coroutineRunning)

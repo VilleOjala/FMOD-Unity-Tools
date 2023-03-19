@@ -43,16 +43,12 @@ namespace FMODUnityTools
         private List<RoomAwareInstance> registeredInstances = new List<RoomAwareInstance>();
         private Vector3 listenerPosition;
 
-        /*
-        When a level starts, each SpatialAudioRoom will be set as a starting room and all the directly or indirectly reachable rooms from it are then searched for.
-        <-This should encompass all the other rooms in the level if the spatial audio geometry has been set up correctly.
-        The connected rooms will be stored on a list as they are discovered.
-        <- This means that the rooms closer to the starting room will be higher up on the list.
-        When we know the previous room for a sound, we can then optimize the new room look-up by checking against the room connection list of the previous room. 
-        <- In other words, the sound is now most likely located either in the same room or in one of the rooms nearby, rather than on the other side of the map,
-           unless, of course, your game includes teleporting or some other unconventional type of movement..
-        First-time room look-up for a sound still requires testing against all of the rooms, unless a permanent room has been manually provided upon sound registration.
-        */
+        /* On Awake, each SpatialAudioRoom is treated as a starting room and all the directly or indirectly reachable rooms from it are then searched for.
+         * This search should encompass all the other rooms in the level if the spatial audio geometry has been set up correctly. The connected rooms 
+         * will be added to a list as they are discovered, which means that the rooms closer to the starting room will be higher up on the list.
+         * Consequently, if we know the previous room for a sound, we can optimize the new room look-up by checking against the room connection list of the previous room, 
+         * as the sound is now most likely located either in the same room or in one of the rooms nearby. First-time room look-up for a sound still requires 
+         * testing against all of the rooms, unless a permanent room has been manually provided upon sound registration. */
         private Dictionary<SpatialAudioRoom, List<SpatialAudioRoom>> orderedConnections = new Dictionary<SpatialAudioRoom, List<SpatialAudioRoom>>();
 
         private List<RoomAwareInstance> instancesWithKnownRoom = new List<RoomAwareInstance>();
@@ -66,9 +62,9 @@ namespace FMODUnityTools
         Dictionary<SpatialAudioPortal, float> distancesThroughArrivalPortals = new Dictionary<SpatialAudioPortal, float>();
         private Dictionary<SpatialAudioPortal, Vector3> portalClosestPoints = new Dictionary<SpatialAudioPortal, Vector3>();
 
-        // When calculating the diffraction angle for a given portal, the angle will be set to zero if the magnitude of either vector is below this value.
-        // This is done to prevent bugs/edge cases in angle calculations when the listener or an emitter is crossing a room boundary. 
-        // <- Using very short vectors for calculations may cause sudden immersion-breaking jumps/artefacts in the obtained diffraction values.
+        /* When calculating a diffraction angle for a portal, the angle will be set to zero if the magnitude of either vector is below this constant value.
+         * This is done to prevent undesired results in angle calculations when the listener or an emitter is crossing a room boundary. 
+         * Using very short vectors for calculations may cause sudden immersion-breaking jumps/artefacts in the obtained diffraction values. */
         private const float MinimumVectorMagnitude = 0.05f;
         private bool managerInitialized = false;
 
@@ -78,10 +74,9 @@ namespace FMODUnityTools
         [SerializeField]
         private List<string> debugData = new List<string>();
 
-        // In contrast to Wwise, FMOD does not currently include API functionality for multipositioning EventInstances dynamically from script.
-        // Nevertheless, this setting is for visualizing from which direction / distance a sound should be heard emanating from when it arrives to
-        // the listener through portal openings.
-        // If a multipositioning feature is added to FMOD sometime in the future, it is easy to modify this tool to take advantage of it.
+        /* In contrast to Wwise, FMOD does not currently include API functionality for multipositioning EventInstances dynamically at runtime.
+         * Nevertheless, this setting is for visualizing from which direction / distance a sound should be heard emanating from as it arrives to
+         * the listener through portal openings. */
         private bool visualizeEmitterVirtualPositions = false;
 
         [System.Flags]
@@ -282,7 +277,7 @@ namespace FMODUnityTools
             roomAwareInstance.currentRoom = fixedRoom;
             roomAwareInstance.fixedRoom = fixedRoom;
 
-            // Set propagation cost and osbtruction (if applicable) to max value, before the first correct values are calculated on LateUpdate.
+            // Set propagation cost and osbtruction (if applicable) to max value before the first correct values are calculated on LateUpdate.
             if (activeModes.HasFlag(ActiveModes.PropagationCost))
             {
                 if (HelperMethods.InitializeLocalParameterID(eventDescription, Parameters.PropagationCostParameter, ref roomAwareInstance.propagationID))
@@ -342,10 +337,9 @@ namespace FMODUnityTools
             CheckRegisteredInstanceValidity();
             UpdateInstancePositionalData();
 
-            // Find registered instances that are within hearing distance from the listener.
-            // <- In other words, we don't want to run spatial audio calculations for sounds that are inaudible anyway.
-            // If the propagation cost mode is active then also store the calculated listener-to-emitter distances, 
-            // since they will be again needed later on during the check protocol.
+            /* Find registered instances that are within hearing distance from the listener, as we don't want to run spatial audio calculations 
+             * for sounds that are inaudible anyway. If the propagation cost mode is active, then also store the calculated listener-emitter distances, 
+             * since they will be again needed later on during the check protocol. */
             audibleInstances.Clear();
             instanceToListenerDistances.Clear();
             CheckInstanceAudibility(audibleInstances, instanceToListenerDistances);
@@ -354,15 +348,14 @@ namespace FMODUnityTools
             {
                 currentListenerRoom = GetHighestPriorityRoom();
 
-                // Find the current room for each registree.
-                // Put aside the registered instances for which the room lookup failed.
-                // If the current room was known previously, a new room check is only performed when the position of the registree has changed.
+                /* Try to find the current room of each registree an put aside the instances for which the lookup failed.
+                 * If the occupied room was known last frame, a new room lookup is only performed when the position of the registree has changed. */
                 instancesWithKnownRoom.Clear();
                 instancesWithUnknownRoom.Clear();
                 UpdateRegisteredInstanceRoom(instancesWithKnownRoom, instancesWithUnknownRoom);
 
-                // If the registree room cannot be determined, we will remove all propagation cost and obsruction from it.
-                // <- Lesser evil than potentially missing hearing some vital audio, such as dialogue etc. 
+                /* If the registree room cannot be determined, we will remove all propagation cost and obsruction from it.
+                 * This is a lesser evil than potentially missing hearing some crucial audio, such as dialogue that should be audible */
                 ResetPropagationCost(instancesWithUnknownRoom);
                 if (activeModes.HasFlag(ActiveModes.Obstruction))
                 {
@@ -374,7 +367,7 @@ namespace FMODUnityTools
                 instancesInOtherRooms.Clear();
                 DivideInstancesByListenerRelativePosition(instancesWithKnownRoom, instancesInListenerRoom, instancesInOtherRooms, currentListenerRoom);
 
-                // Remove any previously added propagation cost from registered instances that are in the same room with the listener.
+                // Remove any previously added propagation cost from registered instances that are now in the same room with the listener.
                 ResetPropagationCost(instancesInListenerRoom);
 
                 // Calculate propagation cost for instances in non-listener rooms.                  
@@ -527,7 +520,7 @@ namespace FMODUnityTools
                         }
                         else
                         {
-                            // Remove the previously known room, since we cannot know what has happened when the instance has moved.
+                            // Remove the previously known room, as we cannot know what has happened when the instance has moved.
                             instance.currentRoom = null;
                             instancesWithUnknownRoom.Add(instance);
                         }
@@ -635,7 +628,6 @@ namespace FMODUnityTools
             }
         }
 
-        // Divides instances based on whether they are located in the same room with the listener or inside some other room.
         private void DivideInstancesByListenerRelativePosition(List<RoomAwareInstance> allRelevantInstances, 
                                                                List<RoomAwareInstance> instancesInListenerRoom, 
                                                                List<RoomAwareInstance> instancesInOtherRooms, 

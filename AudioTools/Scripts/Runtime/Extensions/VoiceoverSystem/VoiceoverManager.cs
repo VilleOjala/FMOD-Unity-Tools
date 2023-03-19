@@ -87,8 +87,8 @@ namespace FMODUnityTools
             }
         }
 
-        // Game's dialogue system should call this function to start playing voiceovers for a new dialogue, 
-        // or to provide the next line in an already playing dialogue when it receives a callback from the VoiceoverManager.
+        /* Game's dialogue system should call this function to start playing voiceovers for a new dialogue, or to provide 
+         * the next line in an already playing dialogue when it receives a callback from the VoiceoverManager. */
         public void PlayDialogue(Speaker speaker, string key, string dialogueName)
         {
             if (playbackHandlersBySpeaker.ContainsKey(speaker))
@@ -107,9 +107,9 @@ namespace FMODUnityTools
                     releaseOffset = keyOffsetPairs[key];
                 }
 
-                // result == -1 -> something unexpected failed in starting the dialogue line.
-                // result == 0  -> the speaker is busy with another dialogue line, queue this line and try again once the speaker reports that it is now available
-                // result == 1  -> starting the dialogue line succeeded.
+                /* result == -1 -> something unexpected failed in starting the dialogue line.
+                 * result == 0  -> the speaker is busy with another dialogue line - queue this line and try again once the speaker reports that it is now available.
+                 * result == 1  -> starting the dialogue line succeeded. */
                 int result = playbackHandler.PlayVoiceover(key, dialogueName, releaseOffset);
 
                 if (result == 1)
@@ -177,7 +177,7 @@ namespace FMODUnityTools
             }
         }
 
-        // VoiceoverPlaybackHandlers report themselves as being available for a new dialogue line once they are finished with the previous one.
+        // VoiceoverPlaybackHandlers report themselves as being available for a new dialogue line once they have finished with the previous one.
         public void ReportSpeakerAvailability(Speaker availableSpeaker, string latestPlayingDialogue)
         {
             // Remove the association of the speaker with the dialogue it just finished playing voiceovers for (if the dialogue is still active).

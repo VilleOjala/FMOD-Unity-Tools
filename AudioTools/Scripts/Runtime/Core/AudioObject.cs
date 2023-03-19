@@ -21,10 +21,10 @@ namespace FMODUnityTools
     {
         public EventTag eventTag;
 
-        [SerializeField, Tooltip("For 3D sounds. If left empty, sounds follow the position of this Game Object.")]
+        [SerializeField, Tooltip("For 3D sounds. If left empty, sounds follow the position of this GameObject.")]
         private Transform followTarget;
 
-        [SerializeField, Tooltip("For 3D sounds requiring velocity updates")]
+        [SerializeField, Tooltip("For 3D sounds requiring velocity updates.")]
         private Rigidbody rb;
 
         /// <summary>
@@ -148,7 +148,7 @@ namespace FMODUnityTools
 
             if (!eventDescription.isValid())
             {
-                Debug.LogError("Creating an event instance failed for Audio Object '" + gameObject.name + "'.");
+                Debug.LogError("Creating an EventInstance failed for AudioObject '" + gameObject.name + "'.");
                 return;
             }
 

@@ -55,7 +55,7 @@ namespace FMODUnityTools
             {
                 if (eventReference.IsNull)
                 {
-                    Debug.LogWarning("Referenced event description is invalid and the provided event reference is null.");
+                    Debug.LogWarning("Referenced EventDescription is invalid and the provided EventReference is null.");
                     return false;
                 }
                 else

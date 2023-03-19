@@ -14,7 +14,7 @@ namespace FMODUnityTools
     {
         private SpatialAudioManager spatialAudioManager;
 
-        [Tooltip("Optionally give the room a unique name for more informative debug messages.")]
+        [Tooltip("Optionally, give the room a unique name for more informative debug messages.")]
         public string roomName;
         public AudioTriggerArea triggerArea;
 
@@ -48,7 +48,7 @@ namespace FMODUnityTools
             if (caller == null)
             {
                 string offendingRoom = (string.IsNullOrEmpty(roomName) ? gameObject.name : roomName);
-                Debug.LogError("Initialization of Spatial Audio Room '" + offendingRoom + "' failed. Spatial Audio Manager was null.");
+                Debug.LogError("Initialization of SpatialAudioRoom '" + offendingRoom + "' failed. SpatialAudioManager was null.");
                 return false;
             }
             else
@@ -59,14 +59,14 @@ namespace FMODUnityTools
             if (roomAlreadyInitalized)
             {
                 string offendingRoom = (string.IsNullOrEmpty(roomName) ? gameObject.name : roomName);
-                Debug.LogError("Spatial Audio Room '" + offendingRoom + "' has already been initialized. Check for duplicates.");
+                Debug.LogError("SpatialAudioRoom '" + offendingRoom + "' has already been initialized. Check for any duplicates.");
                 return false;
             }
 
             if (triggerArea == null)
             {
                 string offendingRoom = (string.IsNullOrEmpty(roomName) ? gameObject.name : roomName);
-                Debug.LogError("Audio Trigger Area is null for Spatial Audio Room '" + offendingRoom + "'.");
+                Debug.LogError("AudioTriggerArea is null for SpatialAudioRoom '" + offendingRoom + "'.");
                 return false;
             }
             else
@@ -76,7 +76,7 @@ namespace FMODUnityTools
                 if (colliders == null || colliders.Count < 1)
                 {
                     string offendingRoom = (string.IsNullOrEmpty(roomName) ? gameObject.name : roomName);
-                    Debug.LogError("Spatial Audio Room '" + offendingRoom + "' has no valid trigger colliders.");
+                    Debug.LogError("SpatialAudioRoom '" + offendingRoom + "' has no valid trigger colliders.");
                     return false;
                 }               
             }
@@ -88,21 +88,21 @@ namespace FMODUnityTools
                 if (roomConnection == null)
                 {
                     string offendingRoom = (string.IsNullOrEmpty(roomName) ? gameObject.name : roomName);
-                    Debug.LogError("Room connection is null for Spatial Audio Room '" + offendingRoom + "'.");
+                    Debug.LogError("Room connection is null for SpatialAudioRoom '" + offendingRoom + "'.");
                     return false;
                 }
 
                 if (roomConnection.connectedRoom == null)
                 {
                     string offendingRoom = (string.IsNullOrEmpty(roomName) ? gameObject.name : roomName);
-                    Debug.LogError("Room connection's connected room is null for Spatial Audio Room '" + offendingRoom + "'.");
+                    Debug.LogError("Room connection's connected room is null for SpatialAudioRoom '" + offendingRoom + "'.");
                     return false;
                 }
 
                 if (roomConnection.connectingPortals == null)
                 {
                     string offendingRoom = (string.IsNullOrEmpty(roomName) ? gameObject.name : roomName);
-                    Debug.LogError("Room connection's connecting portals is null for Spatial Audio Room '" + offendingRoom + "'.");
+                    Debug.LogError("Room connection's connecting portals is null for SpatialAudioRoom '" + offendingRoom + "'.");
                     return false;
                 }
 
@@ -111,17 +111,16 @@ namespace FMODUnityTools
                     if (roomConnection.connectingPortals[j] == null)
                     {
                         string offendingRoom = (string.IsNullOrEmpty(roomName) ? gameObject.name : roomName);
-                        Debug.LogError("Room connection's connecting portal is null for Spatial Audio Room '" + offendingRoom + "'.");
+                        Debug.LogError("Room connection's connecting portal is null for SpatialAudioRoom '" + offendingRoom + "'.");
                         return false;
                     }
                 }
             }
 
-            // Sanity checks completed. Next, we will programatically set this room be one of the two rooms that any portal found in room connections connects.
-            //  <-This reduces the need for manual set-up in the Editor. 
-            //  <-In addition, the availability of "other-way-around" references simplifies the propagation cost code.
-            // In a proper spatial audio geometry setup, each portal can only connect two rooms. 
-            //  <-An error is thrown if more than two rooms try to assign themselves to a single portal.
+            /* Sanity checks completed. Next, we will set this room be one of the two rooms that any portal found in room connections connects,
+             * which reduces the need for manual setup in the Editor. In addition, the availability of "other-way-around" references simplifies 
+             * the propagation cost -related code. In a proper spatial audio geometry setup, each portal can only connect two rooms and an error 
+             * is thrown if more than two rooms try to assign themselves to a single portal. */
             for (int i = 0; i < roomConnections.Count; i++)
             {
                 var roomConnection = roomConnections[i];

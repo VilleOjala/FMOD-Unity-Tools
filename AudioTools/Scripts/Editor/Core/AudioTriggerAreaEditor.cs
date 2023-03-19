@@ -11,7 +11,7 @@ namespace FMODUnityTools
     [CanEditMultipleObjects]
     public class AudioTriggerAreaEditor : Editor
     {
-        //Change these to your project specific paths
+        // Change these to your project specific paths.
         private const string DebugMaterialPath = "Assets/Scripts/FMOD-Audio-Tools/FMOD-Unity-Tools/AudioTools/Assets/Materials/DebugTriggerGreen.mat";
         private const string WedgeMeshPath = "Assets/Scripts/FMOD-Audio-Tools/FMOD-Unity-Tools/AudioTools/Assets/Meshes/Wedge.mesh";
 

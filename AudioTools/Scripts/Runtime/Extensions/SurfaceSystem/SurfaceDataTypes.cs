@@ -7,11 +7,10 @@ using UnityEngine;
 
 namespace FMODUnityTools
 {
-    // Surfaces can be added / removed as per project's needs, except 'Water' should always stay included,
-    // since the logic in SurfaceChecker class for figuring out the water depth is only done if the type of surface is first
-    // determined to be 'Water'.
-    // The numbering of parameter options inside FMOD Studio authoring tool should match those in SurfaceType and WaterDepth enums,
-    // since numbers (instead of string labels) are used for parameter setting in this toolset.
+    /* Surfaces can be added / removed as per project's needs, except for 'Water', which should always be included. 
+     * This is because the logic in SurfaceChecker class for figuring out the water depth is only run if the surface type
+     * is first determined to be 'Water'. The numbering of parameter options inside FMOD Studio authoring tool should match 
+     * those in SurfaceType and WaterDepth enums, as numbers (instead of string labels) are used for parameter setting in this toolset. */
 
     public enum SurfaceType
     {

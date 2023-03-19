@@ -13,8 +13,8 @@ namespace FMODUnityTools
         public ControlAction controlAction;
         public ParamRef[] parameters;
 
-        // Use this method name when assigning events to animation keyframes 
-        // and pass an EventTag as an argument to target specific AudioObjects. 
+        /* Use this method name when assigning events to animation keyframes 
+         * and pass an EventTag as an argument to target specific AudioObjects.*/ 
         public void OnAnimationEvent(Object unityObject)
         {
             if (unityObject == null)
