@@ -826,6 +826,11 @@ namespace FMODUnityTools
         {
             foreach (var instance in instances)
             {
+                if (!audibleInstances.Contains(instance))
+                {
+                    continue;
+                }
+
                 Vector3 instancePosition = instance.currentPosition;
                 float directRouteLength = instanceToListenerDistances[instance];
                 bool foundPair = TryGetMatchingRoomPair(instance.currentRoom, currentListenerRoom, out RoomPair roomPair);
