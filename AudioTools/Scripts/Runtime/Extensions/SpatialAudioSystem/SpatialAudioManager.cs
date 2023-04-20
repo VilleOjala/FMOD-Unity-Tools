@@ -484,6 +484,7 @@ namespace FMODUnityTools
                 if (instance.fixedRoom != null)
                 {
                     instance.currentRoom = instance.fixedRoom;
+                    instancesWithKnownRoom.Add(instance);
                     continue;
                 }
 
