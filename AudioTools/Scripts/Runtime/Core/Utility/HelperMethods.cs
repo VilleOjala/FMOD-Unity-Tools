@@ -15,7 +15,7 @@ namespace FMODUnityTools
             if (collider == null)
                 return false;
 
-            return (collider.ClosestPoint(position) - position).sqrMagnitude < Mathf.Epsilon * Mathf.Epsilon;
+            return Mathf.Approximately((collider.ClosestPoint(position) - position).magnitude, 0);
         }
 
         public static bool GetIfLayerMaskContainsLayer(int layer, LayerMask layerMask)
