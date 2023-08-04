@@ -1016,6 +1016,9 @@ namespace FMODUnityTools
             float difference = routeLength - directRouteLength;
             float scaledRolloff = instance.maxDistance - difference;
 
+            // Clamp the scaledRolloff to make sure it's never negative
+            scaledRolloff = Mathf.Max(scaledRolloff, 0f);
+
             if (instance.eventInstance.isValid())
             {
                 var result = instance.eventInstance.setProperty(EVENT_PROPERTY.MAXIMUM_DISTANCE, scaledRolloff);
